@@ -129,7 +129,7 @@ button.ava:hover{background-color:var(--dim)}
       <ul class="adl" id="adList"></ul>
       <button class="btn full" type="button" id="adOut">Закрыть</button>
     </div>
-    <p class="note">Аккаунты и сообщения хранятся на сервере. Доступны с любого устройства.</p>
+    <p class="note">Аккаунты хранятся только в этом браузере. На другом устройстве их не будет.</p>
   </div>
 </div>
 
@@ -158,464 +158,344 @@ button.ava:hover{background-color:var(--dim)}
 
 <div class="modal" id="modal" hidden><div class="card" id="pcard"></div></div>
 
+<!-- Firebase SDK (только для сообщений и админки) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
 <script>
 (function(){
-  "use strict";
+  var $=function(id){return document.getElementById(id)};
+  var USERS="divine-net-users-v1", SESSION="divine-net-session-v1", SRV="divine-net-server-v1";
+  var ADSALT="divine-admin", ADHASH="cd0159aca7bbdb576d4beec4912e52a6bbd97f1205510b3c2a03e829b1c75208";
+  var CH=[{id:"announcements",name:"announcements",sub:"Новости сервера"},{id:"general",name:"general",sub:"Общий чат"}];
+  var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
+  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app");
 
+  /* ================= FIREBASE (только для сообщений/админки) =================
+     ВСТАВЬ СВОИ КЛЮЧИ ИЗ FIREBASE CONSOLE:
+     Project settings → General → Your apps → </> Web → firebaseConfig
+  */
   var firebaseConfig = {
     apiKey:            "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
     authDomain:        "divine-net.firebaseapp.com",
     projectId:         "divine-net",
     storageBucket:     "divine-net.firebasestorage.app",
     messagingSenderId: "477692936922",
-    appId:             "1:477692936922:web:fdd8daab2a89c588f91be3"
+    appId:             "ВСТАВЬ_APP_ID"
   };
+  var fbReady=false, fbdb=null;
+  var unsubMsgs=null, unsubUsers=null;
+  var remoteUsers={};   // профили из Firestore (для отображения в чате/профилях)
+  try{
+    if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
+      firebase.initializeApp(firebaseConfig);
+      fbdb=firebase.firestore();
+      fbReady=true;
+    }
+  }catch(e){ console.error("Firebase:",e); fbReady=false; }
 
-  firebase.initializeApp(firebaseConfig);
-  var auth = firebase.auth();
-  var db   = firebase.firestore();
-  var FieldValue = firebase.firestore.FieldValue;
-
-  var $ = function(id){ return document.getElementById(id) };
-  var el = function(tag, cls, text){
-    var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
-    return e;
-  };
-
-  var CH = [
-    { id: "announcements", name: "announcements", sub: "Новости сервера" },
-    { id: "general",       name: "general",       sub: "Общий чат" }
-  ];
-  var GLYPHS = ["◐","◑","▲","●","■","✦","☾","☻"];
-  var ADSALT = "divine-admin";
-  var ADHASH = "cd0159aca7bbdb576d4beec4912e52a6bbd97f1205510b3c2a03e829b1c75208";
-  var EMAIL_DOMAIN = "divine-net.app";
-
-  var me = null;
-  var usersMap = {};
-  var cur = CH[0].id;
-  var mode = "in";
-  var draft = null;
-  var unsubMsgs = null;
-  var unsubUsers = null;
-  var lastMessages = [];
-  var appEl = $("app");
-
-  function okImg(a){ return typeof a === "string" && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(a); }
-  function paint(node, acc, name){
-    var a = acc && acc.avatar;
-    node.textContent = ""; node.style.backgroundImage = "";
-    if (okImg(a)) node.style.backgroundImage = "url(" + a + ")";
-    else if (GLYPHS.indexOf(a) > -1) node.textContent = a;
-    else node.textContent = (name || "?").charAt(0).toUpperCase();
+  function subscribeMessages(channelId){
+    if(!fbReady) return;
+    if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
+    unsubMsgs = fbdb.collection("channels").doc(channelId).collection("messages")
+      .orderBy("createdAt","asc").limit(500)
+      .onSnapshot(function(snap){
+        var arr=[];
+        snap.forEach(function(d){
+          var x=d.data();
+          arr.push({
+            by: x.by,
+            name: x.name,
+            text: x.text,
+            t: x.createdAt ? x.createdAt.toDate().getTime() : Date.now()
+          });
+        });
+        data[channelId]=arr;
+        if(cur===channelId) renderMsgs();
+      }, function(e){ console.error("messages:",e); });
   }
-  function sha256hex(str){
-    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function(buf){
-      return Array.prototype.map.call(new Uint8Array(buf), function(x){
-        return ("0" + x.toString(16)).slice(-2);
-      }).join("");
+
+  function subscribeUsers(){
+    if(!fbReady) return;
+    if(unsubUsers){ unsubUsers(); unsubUsers=null; }
+    unsubUsers = fbdb.collection("users").onSnapshot(function(snap){
+      remoteUsers={};
+      snap.forEach(function(d){ remoteUsers[d.id]=d.data(); });
+      if(me) renderMe();
+      renderMsgs();
+    }, function(e){ console.error("users:",e); });
+  }
+
+  function fbSaveUser(key, payload){
+    if(!fbReady) return;
+    fbdb.collection("users").doc(key).set(payload,{merge:true}).catch(function(e){console.error("saveUser:",e);});
+  }
+  /* ========================================================================= */
+
+  function rd(k,d){ try{ var v=JSON.parse(localStorage.getItem(k)); return v==null?d:v; }catch(e){ return d; } }
+  function wr(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
+  function users(){ var u=rd(USERS,{}); return u&&typeof u==="object"&&!Array.isArray(u)?u:{}; }
+  function loadData(){ var d=rd(SRV,{}); data={}; CH.forEach(function(c){ data[c.id]=d&&Array.isArray(d[c.id])?d[c.id]:[]; }); }
+  function hash(pw,salt){
+    return crypto.subtle.digest("SHA-256",new TextEncoder().encode(salt+":"+pw)).then(function(b){
+      return Array.prototype.map.call(new Uint8Array(b),function(x){return ("0"+x.toString(16)).slice(-2)}).join("");
     });
   }
-  function nameToEmail(name){
-    return sha256hex(name.toLowerCase().trim()).then(function(hex){
-      return hex + "@" + EMAIL_DOMAIN;
+  function okImg(a){ return typeof a==="string"&&/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(a); }
+  function paint(el,acc,name){
+    var a=acc&&acc.avatar; el.textContent=""; el.style.backgroundImage="";
+    if(okImg(a)) el.style.backgroundImage="url("+a+")";
+    else if(GLYPHS.indexOf(a)>-1) el.textContent=a;
+    else el.textContent=(name||"?").charAt(0).toUpperCase();
+  }
+  function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+  function getAcc(key){ return remoteUsers[key] || users()[key] || null; }
+
+  /* ---------- мессенджер ---------- */
+  function chan(){ return CH.filter(function(c){return c.id===cur})[0]; }
+  function renderList(){
+    var ul=$("list"); ul.innerHTML="";
+    CH.forEach(function(c){
+      var li=el("li",c.id===cur?"on":""), b=el("button",null,"# "+c.name); b.type="button";
+      b.onclick=function(){ cur=c.id; app.classList.add("open"); if(fbReady) subscribeMessages(cur); render(true); $("input").focus(); };
+      li.appendChild(b); ul.appendChild(li);
     });
   }
-
-  /* ===== UI ===== */
-  function setMode(m){
-    mode = m;
-    $("tabIn").setAttribute("aria-selected", m === "in");
-    $("tabUp").setAttribute("aria-selected", m === "up");
-    $("tabAd").setAttribute("aria-selected", m === "ad");
-    $("u").parentNode.hidden = m === "ad"; $("u").required = m !== "ad";
-    $("p2row").hidden = m !== "up"; $("p2").required = m === "up";
-    $("p").autocomplete = m === "up" ? "new-password" : "current-password";
-    $("authBtn").textContent = m === "up" ? "Создать аккаунт" : m === "ad" ? "Открыть" : "Войти";
-    $("err").textContent = "";
-  }
-  function hidePw(){
-    $("eye").setAttribute("aria-pressed","false");
-    $("eye").textContent = "Показать пароль";
-    $("p").type = "password"; $("p2").type = "password";
-  }
-
-  $("tabIn").addEventListener("click", function(){ setMode("in") });
-  $("tabUp").addEventListener("click", function(){ setMode("up") });
-  $("tabAd").addEventListener("click", function(){ setMode("ad") });
-  $("eye").addEventListener("click", function(){
-    var show = $("eye").getAttribute("aria-pressed") !== "true";
-    $("eye").setAttribute("aria-pressed", String(show));
-    $("eye").textContent = show ? "Скрыть пароль" : "Показать пароль";
-    $("p").type  = show ? "text" : "password";
-    $("p2").type = show ? "text" : "password";
-  });
-  $("back").onclick = function(){ appEl.classList.remove("open") };
-  $("modal").addEventListener("click", function(e){ if (e.target === $("modal")) closeProfile() });
-  document.addEventListener("keydown", function(e){ if (e.key === "Escape") closeProfile() });
-  $("meBtn").onclick = function(){ if (me) openProfile(me.uid, me.name) };
-  $("out").onclick = function(){ auth.signOut() };
-
-  /* ===== АДМИНКА ===== */
-  function adminToggle(on){
-    [".tabs","#authForm",".note","#intro"].forEach(function(s){
-      var n = document.querySelector(s);
-      if (n) n.hidden = on;
+  function renderMe(){ var acc=getAcc(me.key); paint($("meAva"),acc,me.name); $("who").textContent=me.name; }
+  function renderMsgs(force){
+    var c=chan(), box=$("msgs"), list=data[cur]||[];
+    var near=box.scrollHeight-box.scrollTop-box.clientHeight<80;
+    $("topName").textContent="# "+c.name; $("topSub").textContent=c.sub; $("input").placeholder="Написать в #"+c.name;
+    box.innerHTML="";
+    if(!list.length) box.appendChild(el("p","empty","Здесь пока тихо. Напишите первым."));
+    list.forEach(function(m){
+      var acc=getAcc(m.by), name=acc?acc.name:m.name, row=el("div","m");
+      var a=el("button","ava"); a.type="button"; paint(a,acc,name); a.setAttribute("aria-label","Профиль: "+name);
+      a.onclick=function(){ openProfile(m.by,name); };
+      var b=el("div","b"), h=el("div","h"), n=el("button","nm",name); n.type="button";
+      n.onclick=function(){ openProfile(m.by,name); };
+      h.appendChild(n); h.appendChild(el("time",null,new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
+      b.appendChild(h); b.appendChild(el("p",null,m.text)); row.appendChild(a); row.appendChild(b); box.appendChild(row);
     });
-    $("adminView").hidden = !on;
+    if(force||near) box.scrollTop=box.scrollHeight;
   }
-  $("adOut").addEventListener("click", function(){
-    adminToggle(false);
-    setMode("in");
-  });
+  function render(force){ renderList(); renderMe(); renderMsgs(force); }
 
-  function showAdmin(){
-    adminToggle(true);
-    $("adCount").textContent = "Загрузка…";
-    $("adList").innerHTML = "";
-    db.collection("users").get().then(function(snap){
-      var arr = [];
-      snap.forEach(function(d){ arr.push({ id: d.id, data: d.data() }); });
-      arr.sort(function(a,b){ return (a.data.name||"").localeCompare(b.data.name||"") });
-      var ul = $("adList"); ul.innerHTML = "";
-      arr.forEach(function(u){
-        var li = el("li");
-        var a  = el("span","ava s"); paint(a, u.data, u.data.name);
-        li.appendChild(a);
-        li.appendChild(el("span","n", u.data.name));
-        ul.appendChild(li);
-      });
-      ul.hidden = !arr.length;
-      $("adCount").textContent = arr.length ? "Всего аккаунтов: " + arr.length : "Аккаунтов пока нет.";
-    }).catch(function(){
-      $("adCount").textContent = "Не удалось загрузить список.";
-    });
+  function enter(name){
+    me={key:name.toLowerCase(),name:name};
+    try{ localStorage.setItem(SESSION,name); }catch(e){}
+    loadData();
+    if(fbReady){ subscribeUsers(); subscribeMessages(cur); }
+    hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open"); render(true);
   }
-
-  /* ===== ПРОФИЛЬ ===== */
-  function closeProfile(){ $("modal").hidden = true; draft = null; }
-
-  function resize(file, cb){
-    var r = new FileReader();
-    r.onload = function(){
-      var img = new Image();
-      img.onload = function(){
-        var s = 128, c = document.createElement("canvas");
-        c.width = c.height = s;
-        var k = Math.max(s/img.width, s/img.height);
-        var w = img.width*k, h = img.height*k;
-        c.getContext("2d").drawImage(img, (s-w)/2, (s-h)/2, w, h);
-        cb(c.toDataURL("image/jpeg", 0.8));
-      };
-      img.onerror = function(){ cb(null) };
-      img.src = r.result;
-    };
-    r.onerror = function(){ cb(null) };
-    r.readAsDataURL(file);
-  }
-
-  function openProfile(uid, displayName){
-    var acc = usersMap[uid] || null;
-    var mine = me && uid === me.uid;
-    var box = $("pcard"); box.innerHTML = ""; $("modal").hidden = false;
-
-    var pf = el("div","pf");
-    var av = el("div","ava l");
-    var nm = el("h2", null, acc ? acc.name : displayName);
-    pf.appendChild(av); pf.appendChild(nm);
-
-    if (!mine){
-      paint(av, acc, displayName);
-      pf.appendChild(el("p", null, acc ? (acc.bio || "Описание не указано.") : "Аккаунт не найден."));
-      box.appendChild(pf);
-      var c1 = el("button","btn ghost full","Закрыть"); c1.type = "button"; c1.onclick = closeProfile;
-      box.appendChild(c1); c1.focus();
+  $("form").onsubmit=function(e){
+    e.preventDefault();
+    var t=$("input").value.trim(); if(!t||!me) return;
+    if(fbReady){
+      fbdb.collection("channels").doc(cur).collection("messages").add({
+        by: me.key, name: me.name, text: t.slice(0,2000),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(function(err){ console.error("send:",err); });
+      $("input").value="";
       return;
     }
+    loadData(); data[cur].push({by:me.key,name:me.name,text:t,t:Date.now()});
+    if(data[cur].length>500) data[cur]=data[cur].slice(-500);
+    wr(SRV,data); $("input").value=""; renderMsgs(true);
+  };
+  $("back").onclick=function(){ app.classList.remove("open"); };
+  $("out").onclick=function(){
+    if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
+    if(unsubUsers){ unsubUsers(); unsubUsers=null; }
+    remoteUsers={};
+    try{ localStorage.removeItem(SESSION); }catch(e){}
+    me=null; closeProfile(); app.hidden=true; $("auth").hidden=false; hidePw(); setMode("in"); $("u").focus();
+  };
+  window.addEventListener("storage",function(e){
+    if(!me) return;
+    if(e.key===SRV && !fbReady){ loadData(); renderMsgs(); }
+    if(e.key===USERS){ renderMe(); renderMsgs(); }
+  });
 
-    draft = { avatar: acc ? (acc.avatar || "") : "" };
-    nm.textContent = "Мой профиль";
-    box.appendChild(pf);
+  /* ---------- профиль ---------- */
+  function closeProfile(){ $("modal").hidden=true; draft=null; }
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeProfile(); });
+  $("modal").addEventListener("click",function(e){ if(e.target===$("modal")) closeProfile(); });
+  $("meBtn").onclick=function(){ openProfile(me.key,me.name); };
 
-    var gb = [];
-    function sync(){
-      paint(av, draft, me.name);
-      gb.forEach(function(b){ b.setAttribute("aria-pressed", String(b.textContent === draft.avatar)) });
+  function resize(file,cb){
+    var r=new FileReader();
+    r.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        var s=128, c=document.createElement("canvas"); c.width=c.height=s;
+        var k=Math.max(s/img.width,s/img.height), w=img.width*k, h=img.height*k;
+        c.getContext("2d").drawImage(img,(s-w)/2,(s-h)/2,w,h);
+        cb(c.toDataURL("image/jpeg",0.8));
+      };
+      img.onerror=function(){ cb(null); };
+      img.src=r.result;
+    };
+    r.onerror=function(){ cb(null); };
+    r.readAsDataURL(file);
+  }
+  function openProfile(key,name){
+    var acc=getAcc(key), mine=!!(me&&key===me.key&&acc), box=$("pcard");
+    box.innerHTML=""; $("modal").hidden=false;
+    var pf=el("div","pf"), av=el("div","ava l"), nm=el("h2",null,acc?acc.name:name);
+    pf.appendChild(av); pf.appendChild(nm);
+    if(!mine){
+      paint(av,acc,name);
+      pf.appendChild(el("p",null,acc?(acc.bio||"Описание не указано."):"Аккаунт удалён."));
+      box.appendChild(pf);
+      var c1=el("button","btn ghost full","Закрыть"); c1.type="button"; c1.onclick=closeProfile; box.appendChild(c1);
+      c1.focus(); return;
     }
-
-    var file = el("input"); file.type = "file"; file.accept = "image/*"; file.hidden = true;
-    var up = el("button","btn ghost full","Загрузить фото"); up.type = "button";
-    up.onclick = function(){ file.click() };
-    var err = el("p","err"); err.setAttribute("role","alert");
-    file.onchange = function(){
-      var f = file.files[0]; if (!f) return; err.textContent = "";
-      resize(f, function(d){
-        if (!d){ err.textContent = "Не удалось открыть изображение."; return; }
-        draft.avatar = d; sync();
-      });
+    draft={avatar:acc.avatar||""};
+    nm.textContent="Мой профиль"; box.appendChild(pf);
+    var gb=[];
+    function sync(){ paint(av,draft,acc.name); gb.forEach(function(b){ b.setAttribute("aria-pressed",String(b.textContent===draft.avatar)); }); }
+    var file=el("input"); file.type="file"; file.accept="image/*"; file.hidden=true;
+    var up=el("button","btn ghost full","Загрузить фото"); up.type="button"; up.onclick=function(){ file.click(); };
+    var err=el("p","err"); err.setAttribute("role","alert");
+    file.onchange=function(){
+      var f=file.files[0]; if(!f) return; err.textContent="";
+      resize(f,function(d){ if(!d){ err.textContent="Не удалось открыть изображение."; return; } draft.avatar=d; sync(); });
     };
     box.appendChild(file); box.appendChild(up);
-    box.appendChild(el("p", null, "Или выберите значок:")).style.margin = ".8rem 0 0";
-
-    var gl = el("div","glyphs");
-    GLYPHS.forEach(function(g){
-      var b = el("button","g", g); b.type = "button";
-      b.setAttribute("aria-label","Значок " + g);
-      b.onclick = function(){ draft.avatar = g; sync() };
-      gb.push(b); gl.appendChild(b);
-    });
+    box.appendChild(el("p",null,"Или выберите значок:")).style.margin=".8rem 0 0";
+    var gl=el("div","glyphs");
+    GLYPHS.forEach(function(g){ var b=el("button","g",g); b.type="button"; b.setAttribute("aria-label","Значок "+g); b.onclick=function(){ draft.avatar=g; sync(); }; gb.push(b); gl.appendChild(b); });
     box.appendChild(gl);
-
-    var reset = el("button","sm","Сбросить аватарку"); reset.type = "button";
-    reset.onclick = function(){ draft.avatar = ""; sync() };
+    var reset=el("button","sm","Сбросить аватарку"); reset.type="button"; reset.onclick=function(){ draft.avatar=""; sync(); };
     box.appendChild(reset);
-
-    var lab = el("label", null, "Описание"); lab.style.marginTop = "1rem";
-    var ta = el("textarea"); ta.rows = 3; ta.maxLength = 200; ta.value = acc ? (acc.bio || "") : "";
-    lab.appendChild(ta);
+    var lab=el("label",null,"Описание"); lab.style.marginTop="1rem";
+    var ta=el("textarea"); ta.rows=3; ta.maxLength=200; ta.value=acc.bio||""; lab.appendChild(ta);
     box.appendChild(lab); box.appendChild(err);
-
-    var row = el("div","row");
-    var save = el("button","btn","Сохранить");
-    var cancel = el("button","btn ghost","Отмена");
-    save.type = "button"; cancel.type = "button"; cancel.onclick = closeProfile;
-
-    save.onclick = function(){
-      save.disabled = true;
-      db.collection("users").doc(me.uid).set({
-        avatar: draft.avatar,
-        bio: ta.value.trim().slice(0, 200)
-      }, { merge: true }).then(function(){
-        me.avatar = draft.avatar;
-        me.bio = ta.value.trim().slice(0, 200);
-        closeProfile();
-      }).catch(function(e){
-        err.textContent = "Не удалось сохранить.";
-      }).then(function(){ save.disabled = false; });
+    var row=el("div","row"), save=el("button","btn","Сохранить"), cancel=el("button","btn ghost","Отмена");
+    save.type="button"; cancel.type="button"; cancel.onclick=closeProfile;
+    save.onclick=function(){
+      var u=users(), bio=ta.value.trim().slice(0,200);
+      if(u[me.key]){ u[me.key].avatar=draft.avatar; u[me.key].bio=bio; if(!wr(USERS,u)){ err.textContent="Не удалось сохранить: слишком большое фото."; return; } }
+      fbSaveUser(me.key, { name: me.name, avatar: draft.avatar, bio: bio });
+      closeProfile(); render();
     };
     row.appendChild(save); row.appendChild(cancel); box.appendChild(row);
     sync();
   }
 
-  /* ===== РЕНДЕР ===== */
-  function chan(){ return CH.filter(function(c){ return c.id === cur })[0] }
-
-  function renderList(){
-    var ul = $("list"); ul.innerHTML = "";
-    CH.forEach(function(c){
-      var li = el("li", c.id === cur ? "on" : "");
-      var b  = el("button", null, "# " + c.name); b.type = "button";
-      b.onclick = function(){
-        cur = c.id;
-        lastMessages = [];
-        appEl.classList.add("open");
-        renderList();
-        subscribeMessages();
-      };
-      li.appendChild(b); ul.appendChild(li);
-    });
+  /* ---------- вход, регистрация, админ ---------- */
+  function hidePw(){
+    $("eye").setAttribute("aria-pressed","false"); $("eye").textContent="Показать пароль";
+    $("p").type="password"; $("p2").type="password";
   }
-
-  function renderMe(){
-    if (!me) return;
-    var acc = usersMap[me.uid] || me;
-    paint($("meAva"), acc, me.name);
-    $("who").textContent = me.name;
+  $("eye").addEventListener("click",function(){
+    var show=$("eye").getAttribute("aria-pressed")!=="true";
+    $("eye").setAttribute("aria-pressed",String(show));
+    $("eye").textContent=show?"Скрыть пароль":"Показать пароль";
+    $("p").type=show?"text":"password"; $("p2").type=show?"text":"password";
+  });
+  function setMode(m){
+    mode=m;
+    $("tabIn").setAttribute("aria-selected",m==="in");
+    $("tabUp").setAttribute("aria-selected",m==="up");
+    $("tabAd").setAttribute("aria-selected",m==="ad");
+    $("u").parentNode.hidden=m==="ad"; $("u").required=m!=="ad";
+    $("p2row").hidden=m!=="up"; $("p2").required=m==="up";
+    $("p").autocomplete=m==="up"?"new-password":"current-password";
+    $("authBtn").textContent=m==="up"?"Создать аккаунт":m==="ad"?"Открыть":"Войти";
+    $("err").textContent="";
   }
+  $("tabIn").addEventListener("click",function(){ setMode("in"); });
+  $("tabUp").addEventListener("click",function(){ setMode("up"); });
+  $("tabAd").addEventListener("click",function(){ setMode("ad"); });
 
-  function renderMsgsFromData(arr){
-    lastMessages = arr;
-    var box = $("msgs");
-    var near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-    box.innerHTML = "";
-    if (!arr.length){
-      box.appendChild(el("p","empty","Здесь пока тихо. Напишите первым."));
+  function adminToggle(on){
+    [".tabs","#authForm",".note","#intro"].forEach(function(s){ document.querySelector(s).hidden=on; });
+    $("adminView").hidden=!on;
+  }
+  function showAdmin(){
+    
+    if(fbReady){
+      adminToggle(true);
+      $("adCount").textContent="Загрузка…";
+      $("adList").innerHTML="";
+      fbdb.collection("users").get().then(function(snap){
+        var list=[];
+        snap.forEach(function(d){ list.push({key:d.id, data:d.data()}); });
+        list.sort(function(a,b){return (a.data.name||"").localeCompare(b.data.name||"")});
+        var ul=$("adList"); ul.innerHTML="";
+        list.forEach(function(u){
+          var li=el("li"), a=el("span","ava s"); paint(a,u.data,u.data.name);
+          li.appendChild(a); li.appendChild(el("span","n",u.data.name)); ul.appendChild(li);
+        });
+        ul.hidden=!list.length;
+        $("adCount").textContent=list.length?"Всего аккаунтов: "+list.length:"Аккаунтов пока нет.";
+      }).catch(function(e){
+        $("adCount").textContent="Ошибка загрузки: "+e.message;
+      });
       return;
     }
-    arr.forEach(function(m){
-      var acc  = usersMap[m.uid] || null;
-      var name = acc ? acc.name : m.name;
-      var row = el("div","m");
-      var a = el("button","ava"); a.type = "button"; paint(a, acc, name);
-      a.setAttribute("aria-label","Профиль: " + name);
-      a.onclick = function(){ openProfile(m.uid, name) };
-      var b = el("div","b"), h = el("div","h");
-      var n = el("button","nm", name); n.type = "button";
-      n.onclick = function(){ openProfile(m.uid, name) };
-      h.appendChild(n);
-      h.appendChild(el("time", null, new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
-      b.appendChild(h); b.appendChild(el("p", null, m.text));
-      row.appendChild(a); row.appendChild(b);
-      box.appendChild(row);
+    /* Fallback: старый локальный список */
+    var all=users(), keys=Object.keys(all).sort(), ul=$("adList"); ul.innerHTML="";
+    keys.forEach(function(k){
+      var li=el("li"), a=el("span","ava s"); paint(a,all[k],all[k].name);
+      var b=el("button","sm",pendDel===k?"Точно удалить?":"Удалить"); b.type="button";
+      b.setAttribute("aria-label","Удалить аккаунт "+all[k].name);
+      b.onclick=function(){
+        if(pendDel!==k){ pendDel=k; showAdmin(); return; }
+        pendDel=null; var u=users(); delete u[k]; wr(USERS,u);
+        try{ if((localStorage.getItem(SESSION)||"").toLowerCase()===k) localStorage.removeItem(SESSION); }catch(e){}
+        showAdmin();
+      };
+      li.appendChild(a); li.appendChild(el("span","n",all[k].name)); li.appendChild(b); ul.appendChild(li);
     });
-    if (near) box.scrollTop = box.scrollHeight;
+    ul.hidden=!keys.length;
+    $("adCount").textContent=keys.length?"Всего аккаунтов: "+keys.length:"Аккаунтов пока нет.";
+    adminToggle(true);
   }
-  function renderMsgs(){ renderMsgsFromData(lastMessages) }
+  $("adOut").addEventListener("click",function(){ pendDel=null; adminToggle(false); setMode("in"); });
 
-  /* ===== ПОДПИСКИ ===== */
-  function subscribeMessages(){
-    if (unsubMsgs){ unsubMsgs(); unsubMsgs = null; }
-    var c = chan();
-    $("topName").textContent = "# " + c.name;
-    $("topSub").textContent  = c.sub;
-    $("input").placeholder   = "Написать в #" + c.name;
-
-    unsubMsgs = db.collection("channels").doc(cur).collection("messages")
-      .orderBy("createdAt", "asc")
-      .limit(200)
-      .onSnapshot(function(snap){
-        var arr = [];
-        snap.forEach(function(d){
-          var x = d.data();
-          arr.push({
-            id: d.id,
-            text: x.text,
-            uid: x.uid,
-            name: x.name,
-            t: x.createdAt ? x.createdAt.toDate() : new Date()
-          });
-        });
-        renderMsgsFromData(arr);
-      });
-  }
-
-  function enterApp(){
-    $("auth").hidden = true;
-    appEl.hidden = false;
-    appEl.classList.remove("open");
-    hidePw();
-
-    if (unsubUsers){ unsubUsers(); unsubUsers = null; }
-    unsubUsers = db.collection("users").onSnapshot(function(snap){
-      usersMap = {};
-      snap.forEach(function(d){ usersMap[d.id] = d.data(); });
-      renderMe();
-      renderMsgs();
-    });
-
-    renderList();
-    subscribeMessages();
-  }
-
-  function exitApp(){
-    if (unsubUsers){ unsubUsers(); unsubUsers = null; }
-    if (unsubMsgs){  unsubMsgs();  unsubMsgs  = null; }
-    usersMap = {}; lastMessages = []; me = null;
-    closeProfile();
-    appEl.hidden = true;
-    $("auth").hidden = false;
-    hidePw();
-    setMode("in");
-    $("u").focus();
-  }
-
-  /* ===== ОТПРАВКА ===== */
-  $("form").onsubmit = function(e){
-    e.preventDefault();
-    if (!me) return;
-    var t = $("input").value.trim();
-    if (!t) return;
-    $("input").value = "";
-    db.collection("channels").doc(cur).collection("messages").add({
-      text: t.slice(0, 2000),
-      uid: me.uid,
-      name: me.name,
-      createdAt: FieldValue.serverTimestamp()
-    });
-  };
-
-  /* ===== ФОРМА ===== */
-  $("authForm").addEventListener("submit", function(ev){
+  $("authForm").addEventListener("submit",function(ev){
     ev.preventDefault();
-    var err = $("err"); err.textContent = "";
-
-    var name = $("u").value.trim();
-    var pw = $("p").value;
-
-    if (mode === "ad"){
-      sha256hex(ADSALT + ":" + pw).then(function(h){
-        if (h !== ADHASH){ err.textContent = "Неверный пароль администратора."; return; }
+    var name=$("u").value.trim(), pw=$("p").value, err=$("err"); err.textContent="";
+    if(!window.crypto||!crypto.subtle){ err.textContent="Браузер не поддерживает безопасный вход."; return; }
+    if(mode==="ad"){
+      hash(pw,ADSALT).then(function(h){
+        if(h!==ADHASH){ err.textContent="Неверный пароль администратора."; return; }
         $("authForm").reset(); hidePw(); showAdmin();
       });
       return;
     }
-
-    if (!/^[A-Za-zА-Яа-яЁё0-9_.-]{3,24}$/.test(name)){
-      err.textContent = "Имя: 3–24 символа, буквы, цифры, _ . -"; return;
-    }
-    if (pw.length < 6){
-      err.textContent = "Пароль должен быть не короче 6 символов."; return;
-    }
-
-    nameToEmail(name).then(function(email){
-      if (mode === "up"){
-        if (pw !== $("p2").value){ err.textContent = "Пароли не совпадают."; return; }
-        auth.createUserWithEmailAndPassword(email, pw).then(function(cred){
-          return db.collection("users").doc(cred.user.uid).set({
-            name: name,
-            nameLower: name.toLowerCase(),
-            avatar: "",
-            bio: "",
-            createdAt: FieldValue.serverTimestamp()
-          });
-        }).then(function(){
-          $("authForm").reset(); hidePw();
-        }).catch(function(e){
-          var code = e.code || "";
-          if (code.indexOf("email-already-in-use") > -1) err.textContent = "Такое имя уже занято.";
-          else if (code.indexOf("weak-password") > -1) err.textContent = "Пароль слишком простой.";
-          else err.textContent = "Не удалось создать аккаунт.";
-        });
-      } else {
-        auth.signInWithEmailAndPassword(email, pw).then(function(){
-          $("authForm").reset(); hidePw();
-        }).catch(function(e){
-          var code = e.code || "";
-          if (code.indexOf("too-many-requests") > -1) err.textContent = "Слишком много попыток. Подождите.";
-          else err.textContent = "Неверное имя или пароль.";
-        });
-      }
-    });
-  });
-
-  /* ===== АВТОРИЗАЦИЯ ===== */
-  function loadProfile(uid){
-    var tries = 0;
-    function attempt(){
-      return db.collection("users").doc(uid).get().then(function(snap){
-        if (snap.exists) return snap.data();
-        if (tries++ < 10){
-          return new Promise(function(r){ setTimeout(r, 200) }).then(attempt);
-        }
-        return null;
+    if(!/^[A-Za-zА-Яа-яЁё0-9_.-]{3,24}$/.test(name)){ err.textContent="Имя: 3–24 символа, буквы, цифры, _ . -"; return; }
+    if(pw.length<6){ err.textContent="Пароль должен быть не короче 6 символов."; return; }
+    var all=users(), key=name.toLowerCase();
+    if(mode==="up"){
+      if(pw!==$("p2").value){ err.textContent="Пароли не совпадают."; return; }
+      if(all[key]){ err.textContent="Такое имя уже занято."; return; }
+      var arr=new Uint8Array(8); crypto.getRandomValues(arr);
+      var salt=Array.prototype.join.call(arr,"-");
+      hash(pw,salt).then(function(h){
+        all[key]={name:name,salt:salt,hash:h,avatar:"",bio:""};
+        if(!wr(USERS,all)){ err.textContent="Не удалось сохранить аккаунт."; return; }
+        
+        fbSaveUser(key, { name: name, avatar: "", bio: "" });
+        $("authForm").reset(); enter(name);
+      });
+    }else{
+      var acc=all[key];
+      if(!acc){ err.textContent="Аккаунт не найден. Создайте его на вкладке «Регистрация»."; return; }
+      hash(pw,acc.salt).then(function(h){
+        if(h!==acc.hash){ err.textContent="Неверный пароль."; return; }
+        $("authForm").reset(); enter(acc.name);
       });
     }
-    return attempt();
-  }
-
-  auth.onAuthStateChanged(function(user){
-    if (!user){ exitApp(); return; }
-    if (me && me.uid === user.uid) return;
-    loadProfile(user.uid).then(function(profile){
-      if (!profile){ auth.signOut(); return; }
-      me = {
-        uid: user.uid,
-        name: profile.name,
-        avatar: profile.avatar || "",
-        bio: profile.bio || ""
-      };
-      enterApp();
-    });
   });
 
-  setMode("in");
-  $("u").focus();
+  try{
+    var s=localStorage.getItem(SESSION), a=s&&users()[s.toLowerCase()];
+    if(a) enter(a.name);
+  }catch(e){}
 })();
 </script>
 </body>
