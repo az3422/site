@@ -24,12 +24,10 @@ button{cursor:pointer}
 ul{list-style:none;margin:0;padding:0}
 :focus-visible{outline:3px solid var(--fg);outline-offset:2px}
 h1,h2{font-family:var(--display);margin:0}
-
 .ava{flex:none;width:2.6rem;height:2.6rem;border-radius:50%;border:2px solid var(--fg);background-color:var(--bg);background-size:cover;background-position:center;display:grid;place-items:center;font-family:var(--display);font-size:1rem;padding:0;overflow:hidden}
 .ava.s{width:2rem;height:2rem;font-size:.8rem}
 .ava.l{width:6rem;height:6rem;font-size:2.2rem}
 button.ava:hover{background-color:var(--dim)}
-
 .btn{background:var(--fg);color:var(--bg);border:2px solid var(--fg);border-radius:999px;padding:.6rem 1.3rem;font-weight:500}
 .btn:hover{background:var(--bg);color:var(--fg)}
 .btn.ghost{background:none;color:var(--fg)}
@@ -37,7 +35,6 @@ button.ava:hover{background-color:var(--dim)}
 .btn.full{width:100%}
 .sm{background:none;border:2px solid var(--fg);border-radius:999px;padding:.15rem .8rem;font-size:.85rem}
 .sm:hover,.sm[aria-pressed=true]{background:var(--fg);color:var(--bg)}
-
 .auth,.modal{position:fixed;inset:0;z-index:5;background:var(--bg);display:grid;place-items:center;padding:1.25rem;overflow-y:auto}
 .modal{background:rgba(0,0,0,.88);z-index:8}
 .card{width:100%;max-width:24rem;border:2px solid var(--fg);border-radius:1.1rem;padding:1.75rem;background:var(--bg)}
@@ -56,7 +53,6 @@ button.ava:hover{background-color:var(--dim)}
 .adl li{display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;border-bottom:1px solid var(--fg)}
 .adl li:last-child{border-bottom:0}
 .adl li span.n{flex:1;min-width:0;overflow-wrap:anywhere}
-
 .pf{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.6rem;margin-bottom:1rem}
 .pf p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .glyphs{display:flex;flex-wrap:wrap;gap:.4rem;margin:.4rem 0 1rem}
@@ -64,7 +60,6 @@ button.ava:hover{background-color:var(--dim)}
 .g:hover,.g[aria-pressed=true]{background:var(--fg);color:var(--bg)}
 .row{display:flex;gap:.6rem;margin-top:.5rem}
 .row .btn{flex:1}
-
 .app{display:grid;grid-template-columns:300px 1fr;height:100%;border:2px solid var(--fg)}
 .side{border-right:2px solid var(--fg);display:flex;flex-direction:column;min-height:0}
 .side h1{font-weight:800;font-size:1.3rem;letter-spacing:-.02em;padding:1.1rem 1.25rem;border-bottom:2px solid var(--fg)}
@@ -77,7 +72,6 @@ button.ava:hover{background-color:var(--dim)}
 .mebtn{display:flex;align-items:center;gap:.6rem;flex:1;min-width:0;background:none;border:0;padding:.2rem;text-align:left;border-radius:.6rem}
 .mebtn:hover{background:var(--dim)}
 #who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
-
 .chat{display:flex;flex-direction:column;min-height:0;min-width:0}
 .top{display:flex;align-items:center;gap:.8rem;padding:.9rem 1.25rem;border-bottom:2px solid var(--fg)}
 .top b{font-family:var(--display);font-weight:500}
@@ -94,7 +88,6 @@ button.ava:hover{background-color:var(--dim)}
 .empty{margin:2rem auto;text-align:center;opacity:.7}
 .sendbar{display:flex;gap:.6rem;padding:.8rem 1.25rem;border-top:2px solid var(--fg)}
 #input{flex:1;min-width:0;background:var(--bg);border:2px solid var(--fg);border-radius:999px;padding:.65rem 1.1rem}
-
 @media (max-width:720px){
   .app{grid-template-columns:1fr;border:0}
   .side{border-right:0}
@@ -129,10 +122,9 @@ button.ava:hover{background-color:var(--dim)}
       <ul class="adl" id="adList"></ul>
       <button class="btn full" type="button" id="adOut">Закрыть</button>
     </div>
-    <p class="note"></p>
+    <p class="note">Аккаунты и сообщения хранятся в Firebase. Доступны с любого устройства.</p>
   </div>
 </div>
-
 <div class="app" id="app" hidden>
   <aside class="side">
     <h1>DIVINE.NET</h1>
@@ -155,246 +147,19 @@ button.ava:hover{background-color:var(--dim)}
     </form>
   </section>
 </div>
-
 <div class="modal" id="modal" hidden><div class="card" id="pcard"></div></div>
 
-<script>
-(function(){
-  var $=function(id){return document.getElementById(id)};
-  var USERS="divine-net-users-v1", SESSION="divine-net-session-v1", SRV="divine-net-server-v1";
-  var ADSALT="divine-admin", ADHASH="cd0159aca7bbdb576d4beec4912e52a6bbd97f1205510b3c2a03e829b1c75208";
-  var CH=[{id:"announcements",name:"announcements",sub:"Новости сервера"},{id:"general",name:"general",sub:"Общий чат"}];
-  var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
-  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app");
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
+         signInWithEmailAndPassword, signOut }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc,
+         query, orderBy, onSnapshot, serverTimestamp, limit }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  function rd(k,d){ try{ var v=JSON.parse(localStorage.getItem(k)); return v==null?d:v; }catch(e){ return d; } }
-  function wr(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
-  function users(){ var u=rd(USERS,{}); return u&&typeof u==="object"&&!Array.isArray(u)?u:{}; }
-  function loadData(){ var d=rd(SRV,{}); data={}; CH.forEach(function(c){ data[c.id]=d&&Array.isArray(d[c.id])?d[c.id]:[]; }); }
-  function hash(pw,salt){
-    return crypto.subtle.digest("SHA-256",new TextEncoder().encode(salt+":"+pw)).then(function(b){
-      return Array.prototype.map.call(new Uint8Array(b),function(x){return ("0"+x.toString(16)).slice(-2)}).join("");
-    });
-  }
-  function okImg(a){ return typeof a==="string"&&/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(a); }
-  function paint(el,acc,name){
-    var a=acc&&acc.avatar; el.textContent=""; el.style.backgroundImage="";
-    if(okImg(a)) el.style.backgroundImage="url("+a+")";
-    else if(GLYPHS.indexOf(a)>-1) el.textContent=a;
-    else el.textContent=(name||"?").charAt(0).toUpperCase();
-  }
-  function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
 
-  /* ---------- мессенджер ---------- */
-  function chan(){ return CH.filter(function(c){return c.id===cur})[0]; }
-  function renderList(){
-    var ul=$("list"); ul.innerHTML="";
-    CH.forEach(function(c){
-      var li=el("li",c.id===cur?"on":""), b=el("button",null,"# "+c.name); b.type="button";
-      b.onclick=function(){ cur=c.id; app.classList.add("open"); render(true); $("input").focus(); };
-      li.appendChild(b); ul.appendChild(li);
-    });
-  }
-  function renderMe(){ paint($("meAva"),users()[me.key],me.name); $("who").textContent=me.name; }
-  function renderMsgs(force){
-    var c=chan(), box=$("msgs"), all=users(), list=data[cur]||[];
-    var near=box.scrollHeight-box.scrollTop-box.clientHeight<80;
-    $("topName").textContent="# "+c.name; $("topSub").textContent=c.sub; $("input").placeholder="Написать в #"+c.name;
-    box.innerHTML="";
-    if(!list.length) box.appendChild(el("p","empty","Здесь пока тихо. Напишите первым."));
-    list.forEach(function(m){
-      var acc=all[m.by], name=acc?acc.name:m.name, row=el("div","m");
-      var a=el("button","ava"); a.type="button"; paint(a,acc,name); a.setAttribute("aria-label","Профиль: "+name);
-      a.onclick=function(){ openProfile(m.by,name); };
-      var b=el("div","b"), h=el("div","h"), n=el("button","nm",name); n.type="button";
-      n.onclick=function(){ openProfile(m.by,name); };
-      h.appendChild(n); h.appendChild(el("time",null,new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
-      b.appendChild(h); b.appendChild(el("p",null,m.text)); row.appendChild(a); row.appendChild(b); box.appendChild(row);
-    });
-    if(force||near) box.scrollTop=box.scrollHeight;
-  }
-  function render(force){ renderList(); renderMe(); renderMsgs(force); }
-
-  function enter(name){
-    me={key:name.toLowerCase(),name:name};
-    try{ localStorage.setItem(SESSION,name); }catch(e){}
-    loadData(); hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open"); render(true);
-  }
-  $("form").onsubmit=function(e){
-    e.preventDefault();
-    var t=$("input").value.trim(); if(!t||!me) return;
-    loadData(); data[cur].push({by:me.key,name:me.name,text:t,t:Date.now()});
-    if(data[cur].length>500) data[cur]=data[cur].slice(-500);
-    wr(SRV,data); $("input").value=""; renderMsgs(true);
-  };
-  $("back").onclick=function(){ app.classList.remove("open"); };
-  $("out").onclick=function(){
-    try{ localStorage.removeItem(SESSION); }catch(e){}
-    me=null; closeProfile(); app.hidden=true; $("auth").hidden=false; hidePw(); setMode("in"); $("u").focus();
-  };
-  window.addEventListener("storage",function(e){
-    if(!me) return;
-    if(e.key===SRV){ loadData(); renderMsgs(); }
-    if(e.key===USERS){ renderMe(); renderMsgs(); }
-  });
-
-  /* ---------- профиль ---------- */
-  function closeProfile(){ $("modal").hidden=true; draft=null; }
-  document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeProfile(); });
-  $("modal").addEventListener("click",function(e){ if(e.target===$("modal")) closeProfile(); });
-  $("meBtn").onclick=function(){ openProfile(me.key,me.name); };
-
-  function resize(file,cb){
-    var r=new FileReader();
-    r.onload=function(){
-      var img=new Image();
-      img.onload=function(){
-        var s=128, c=document.createElement("canvas"); c.width=c.height=s;
-        var k=Math.max(s/img.width,s/img.height), w=img.width*k, h=img.height*k;
-        c.getContext("2d").drawImage(img,(s-w)/2,(s-h)/2,w,h);
-        cb(c.toDataURL("image/jpeg",0.8));
-      };
-      img.onerror=function(){ cb(null); };
-      img.src=r.result;
-    };
-    r.onerror=function(){ cb(null); };
-    r.readAsDataURL(file);
-  }
-  function openProfile(key,name){
-    var acc=users()[key]||null, mine=!!(me&&key===me.key&&acc), box=$("pcard");
-    box.innerHTML=""; $("modal").hidden=false;
-    var pf=el("div","pf"), av=el("div","ava l"), nm=el("h2",null,acc?acc.name:name);
-    pf.appendChild(av); pf.appendChild(nm);
-    if(!mine){
-      paint(av,acc,name);
-      pf.appendChild(el("p",null,acc?(acc.bio||"Описание не указано."):"Аккаунт удалён."));
-      box.appendChild(pf);
-      var c1=el("button","btn ghost full","Закрыть"); c1.type="button"; c1.onclick=closeProfile; box.appendChild(c1);
-      c1.focus(); return;
-    }
-    draft={avatar:acc.avatar||""};
-    nm.textContent="Мой профиль"; box.appendChild(pf);
-    var gb=[];
-    function sync(){ paint(av,draft,acc.name); gb.forEach(function(b){ b.setAttribute("aria-pressed",String(b.textContent===draft.avatar)); }); }
-    var file=el("input"); file.type="file"; file.accept="image/*"; file.hidden=true;
-    var up=el("button","btn ghost full","Загрузить фото"); up.type="button"; up.onclick=function(){ file.click(); };
-    var err=el("p","err"); err.setAttribute("role","alert");
-    file.onchange=function(){
-      var f=file.files[0]; if(!f) return; err.textContent="";
-      resize(f,function(d){ if(!d){ err.textContent="Не удалось открыть изображение."; return; } draft.avatar=d; sync(); });
-    };
-    box.appendChild(file); box.appendChild(up);
-    box.appendChild(el("p",null,"Или выберите значок:")).style.margin=".8rem 0 0";
-    var gl=el("div","glyphs");
-    GLYPHS.forEach(function(g){ var b=el("button","g",g); b.type="button"; b.setAttribute("aria-label","Значок "+g); b.onclick=function(){ draft.avatar=g; sync(); }; gb.push(b); gl.appendChild(b); });
-    box.appendChild(gl);
-    var reset=el("button","sm","Сбросить аватарку"); reset.type="button"; reset.onclick=function(){ draft.avatar=""; sync(); };
-    box.appendChild(reset);
-    var lab=el("label",null,"Описание"); lab.style.marginTop="1rem";
-    var ta=el("textarea"); ta.rows=3; ta.maxLength=200; ta.value=acc.bio||""; lab.appendChild(ta);
-    box.appendChild(lab); box.appendChild(err);
-    var row=el("div","row"), save=el("button","btn","Сохранить"), cancel=el("button","btn ghost","Отмена");
-    save.type="button"; cancel.type="button"; cancel.onclick=closeProfile;
-    save.onclick=function(){
-      var u=users();
-      if(u[me.key]){ u[me.key].avatar=draft.avatar; u[me.key].bio=ta.value.trim().slice(0,200); if(!wr(USERS,u)){ err.textContent="Не удалось сохранить: слишком большое фото."; return; } }
-      closeProfile(); render();
-    };
-    row.appendChild(save); row.appendChild(cancel); box.appendChild(row);
-    sync();
-  }
-
-  /* ---------- вход, регистрация, админ ---------- */
-  function hidePw(){
-    $("eye").setAttribute("aria-pressed","false"); $("eye").textContent="Показать пароль";
-    $("p").type="password"; $("p2").type="password";
-  }
-  $("eye").addEventListener("click",function(){
-    var show=$("eye").getAttribute("aria-pressed")!=="true";
-    $("eye").setAttribute("aria-pressed",String(show));
-    $("eye").textContent=show?"Скрыть пароль":"Показать пароль";
-    $("p").type=show?"text":"password"; $("p2").type=show?"text":"password";
-  });
-  function setMode(m){
-    mode=m;
-    $("tabIn").setAttribute("aria-selected",m==="in");
-    $("tabUp").setAttribute("aria-selected",m==="up");
-    $("tabAd").setAttribute("aria-selected",m==="ad");
-    $("u").parentNode.hidden=m==="ad"; $("u").required=m!=="ad";
-    $("p2row").hidden=m!=="up"; $("p2").required=m==="up";
-    $("p").autocomplete=m==="up"?"new-password":"current-password";
-    $("authBtn").textContent=m==="up"?"Создать аккаунт":m==="ad"?"Открыть":"Войти";
-    $("err").textContent="";
-  }
-  $("tabIn").addEventListener("click",function(){ setMode("in"); });
-  $("tabUp").addEventListener("click",function(){ setMode("up"); });
-  $("tabAd").addEventListener("click",function(){ setMode("ad"); });
-
-  function adminToggle(on){
-    [".tabs","#authForm",".note","#intro"].forEach(function(s){ document.querySelector(s).hidden=on; });
-    $("adminView").hidden=!on;
-  }
-  function showAdmin(){
-    var all=users(), keys=Object.keys(all).sort(), ul=$("adList"); ul.innerHTML="";
-    keys.forEach(function(k){
-      var li=el("li"), a=el("span","ava s"); paint(a,all[k],all[k].name);
-      var b=el("button","sm",pendDel===k?"Точно удалить?":"Удалить"); b.type="button";
-      b.setAttribute("aria-label","Удалить аккаунт "+all[k].name);
-      b.onclick=function(){
-        if(pendDel!==k){ pendDel=k; showAdmin(); return; }
-        pendDel=null; var u=users(); delete u[k]; wr(USERS,u);
-        try{ if((localStorage.getItem(SESSION)||"").toLowerCase()===k) localStorage.removeItem(SESSION); }catch(e){}
-        showAdmin();
-      };
-      li.appendChild(a); li.appendChild(el("span","n",all[k].name)); li.appendChild(b); ul.appendChild(li);
-    });
-    ul.hidden=!keys.length;
-    $("adCount").textContent=keys.length?"Всего аккаунтов: "+keys.length:"Аккаунтов пока нет.";
-    adminToggle(true);
-  }
-  $("adOut").addEventListener("click",function(){ pendDel=null; adminToggle(false); setMode("in"); });
-
-  $("authForm").addEventListener("submit",function(ev){
-    ev.preventDefault();
-    var name=$("u").value.trim(), pw=$("p").value, err=$("err"); err.textContent="";
-    if(!window.crypto||!crypto.subtle){ err.textContent="Браузер не поддерживает безопасный вход."; return; }
-    if(mode==="ad"){
-      hash(pw,ADSALT).then(function(h){
-        if(h!==ADHASH){ err.textContent="Неверный пароль администратора."; return; }
-        $("authForm").reset(); hidePw(); showAdmin();
-      });
-      return;
-    }
-    if(!/^[A-Za-zА-Яа-яЁё0-9_.-]{3,24}$/.test(name)){ err.textContent="Имя: 3–24 символа, буквы, цифры, _ . -"; return; }
-    if(pw.length<6){ err.textContent="Пароль должен быть не короче 6 символов."; return; }
-    var all=users(), key=name.toLowerCase();
-    if(mode==="up"){
-      if(pw!==$("p2").value){ err.textContent="Пароли не совпадают."; return; }
-      if(all[key]){ err.textContent="Такое имя уже занято."; return; }
-      var arr=new Uint8Array(8); crypto.getRandomValues(arr);
-      var salt=Array.prototype.join.call(arr,"-");
-      hash(pw,salt).then(function(h){
-        all[key]={name:name,salt:salt,hash:h,avatar:"",bio:""};
-        if(!wr(USERS,all)){ err.textContent="Не удалось сохранить аккаунт."; return; }
-        $("authForm").reset(); enter(name);
-      });
-    }else{
-      var acc=all[key];
-      if(!acc){ err.textContent="Аккаунт не найден. Создайте его на вкладке «Регистрация»."; return; }
-      hash(pw,acc.salt).then(function(h){
-        if(h!==acc.hash){ err.textContent="Неверный пароль."; return; }
-        $("authForm").reset(); enter(acc.name);
-      });
-    }
-  });
-
-  try{
-<!-- ПОДКЛЮЧАЕМ СЕТЬ FIREBASE -->
-<script src="https://gstatic.com"></script>
-<script src="https://gstatic.com"></script>
-
-<script>
-
+   ============================================================ */
 const firebaseConfig = {
 
   apiKey: "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
@@ -413,34 +178,415 @@ const firebaseConfig = {
 
 };
 
+/* ============================================================ */
 
-firebase.initializeApp(firebaseConfig);
-window.db = firebase.firestore(); 
+const fbApp = initializeApp(firebaseConfig);
+const auth  = getAuth(fbApp);
+const db    = getFirestore(fbApp);
 
+const $  = (id) => document.getElementById(id);
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
-(() => {
-  try {
-    var s = localStorage.getItem(SESSION), a = s && users()[s.toLowerCase()];
-    if(a) enter(a.name);
-  } catch(e) {}
-})();
+const CH = [
+  { id: "announcements", name: "announcements", sub: "Новости сервера" },
+  { id: "general",       name: "general",       sub: "Общий чат" }
+];
+const GLYPHS = ["◐","◑","▲","●","■","✦","☾","☻"];
+const ADSALT = "divine-admin";
+const ADHASH = "cd0159aca7bbdb576d4beec4912e52a6bbd97f1205510b3c2a03e829b1c75208";
+const EMAIL_DOMAIN = "divine-net.app";
 
+let me = null;
+let usersMap = new Map();
+let cur = CH[0].id;
+let mode = "in";
+let draft = null;
+let unsubMsgs = null;
+let unsubUsers = null;
+let lastMessages = [];
+const appEl = $("app");
 
-window.db.collection("messages").orderBy("createdAt", "asc").onSnapshot((snapshot) => {
-  
-  const chatWindow = document.querySelector(".messages") || document.getElementById("chat-window");
-  if (!chatWindow) return;
-  
-  chatWindow.innerHTML = ""; // 
+function okImg(a){ return typeof a === "string" && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(a); }
+function paint(node, acc, name){
+  const a = acc && acc.avatar;
+  node.textContent = ""; node.style.backgroundImage = "";
+  if (okImg(a)) node.style.backgroundImage = "url(" + a + ")";
+  else if (GLYPHS.indexOf(a) > -1) node.textContent = a;
+  else node.textContent = (name || "?").charAt(0).toUpperCase();
+}
+async function sha256hex(str){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(x => ("0" + x.toString(16)).slice(-2)).join("");
+}
+async function nameToEmail(name){
+  const hex = await sha256hex(name.toLowerCase().trim());
+  return hex + "@" + EMAIL_DOMAIN;
+}
+async function loadProfileWithRetry(uid){
+  for (let i = 0; i < 10; i++){
+    try {
+      const snap = await getDoc(doc(db, "users", uid));
+      if (snap.exists()) return snap.data();
+    } catch(e){ console.error(e); }
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return null;
+}
 
-  snapshot.forEach((doc) => {
-    const message = doc.data();
-    
-    const msgHtml = `<div class="message"><b>${message.name}:</b> ${message.text}</div>`;
-    chatWindow.insertAdjacentHTML('beforeend', msgHtml);
-  });
-  chatWindow.scrollTop = chatWindow.scrollHeight; 
+onAuthStateChanged(auth, async (user) => {
+  if (!user){ exitApp(); return; }
+  if (me && me.uid === user.uid) return;
+  const data = await loadProfileWithRetry(user.uid);
+  if (data){
+    me = { uid: user.uid, name: data.name, avatar: data.avatar || "", bio: data.bio || "" };
+    enterApp();
+  } else {
+    try { await signOut(auth); } catch(e){}
+    $("err").textContent = "Профиль не найден. Зарегистрируйтесь заново или смените имя.";
+  }
 });
+
+function enterApp(){
+  $("auth").hidden = true;
+  appEl.hidden = false;
+  appEl.classList.remove("open");
+  hidePw();
+  if (unsubUsers) { unsubUsers(); unsubUsers = null; }
+  unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+    usersMap.clear();
+    snap.forEach(d => usersMap.set(d.id, d.data()));
+    renderMe();
+    renderMsgs();
+  }, (err) => console.error("users snapshot:", err));
+  subscribeMessages();
+  renderList();
+}
+function exitApp(){
+  if (unsubUsers) { unsubUsers(); unsubUsers = null; }
+  if (unsubMsgs)  { unsubMsgs();  unsubMsgs  = null; }
+  usersMap.clear();
+  lastMessages = [];
+  me = null;
+  closeProfile();
+  appEl.hidden = true;
+  $("auth").hidden = false;
+  hidePw();
+  setMode("in");
+  $("u").focus();
+}
+
+function chan(){ return CH.filter(c => c.id === cur)[0]; }
+function renderList(){
+  const ul = $("list"); ul.innerHTML = "";
+  CH.forEach(c => {
+    const li = el("li", c.id === cur ? "on" : "");
+    const b  = el("button", null, "# " + c.name); b.type = "button";
+    b.onclick = () => {
+      cur = c.id; lastMessages = []; appEl.classList.add("open");
+      renderList(); subscribeMessages();
+      if (window.matchMedia("(min-width:721px)").matches) $("input").focus();
+    };
+    li.appendChild(b); ul.appendChild(li);
+  });
+}
+function renderMe(){
+  const acc = usersMap.get(me.uid) || me;
+  paint($("meAva"), acc, me.name);
+  $("who").textContent = me.name;
+}
+
+function subscribeMessages(){
+  if (unsubMsgs) { unsubMsgs(); unsubMsgs = null; }
+  const c = chan();
+  $("topName").textContent = "# " + c.name;
+  $("topSub").textContent  = c.sub;
+  $("input").placeholder   = "Написать в #" + c.name;
+  const q = query(
+    collection(db, "channels", cur, "messages"),
+    orderBy("timestamp", "asc"),
+    limit(200)
+  );
+  unsubMsgs = onSnapshot(q, (snap) => {
+    const arr = [];
+    snap.forEach(d => {
+      const x = d.data();
+      arr.push({
+        id:   d.id,
+        text: x.text,
+        uid:  x.uid,
+        name: x.name,
+        t:    x.timestamp ? x.timestamp.toDate() : new Date()
+      });
+    });
+    renderMsgsFromData(arr);
+  }, (err) => {
+    console.error("messages snapshot:", err);
+    const box = $("msgs"); box.innerHTML = "";
+    box.appendChild(el("p","empty","Ошибка загрузки: " + err.message));
+  });
+}
+
+function renderMsgsFromData(arr){
+  lastMessages = arr;
+  const box = $("msgs");
+  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.innerHTML = "";
+  if (!arr.length){
+    box.appendChild(el("p","empty","Здесь пока тихо. Напишите первым."));
+    return;
+  }
+  arr.forEach(m => {
+    const acc  = usersMap.get(m.uid) || null;
+    const name = acc ? acc.name : m.name;
+    const row = el("div","m");
+    const a = el("button","ava"); a.type = "button"; paint(a, acc, name);
+    a.setAttribute("aria-label","Профиль: " + name);
+    a.onclick = () => openProfile(m.uid, name);
+    const b = el("div","b"), h = el("div","h");
+    const n = el("button","nm", name); n.type = "button";
+    n.onclick = () => openProfile(m.uid, name);
+    h.appendChild(n);
+    h.appendChild(el("time", null, new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
+    b.appendChild(h); b.appendChild(el("p", null, m.text));
+    row.appendChild(a); row.appendChild(b); box.appendChild(row);
+  });
+  if (near) box.scrollTop = box.scrollHeight;
+}
+const renderMsgs = () => renderMsgsFromData(lastMessages);
+
+$("form").onsubmit = async (e) => {
+  e.preventDefault();
+  const t = $("input").value.trim();
+  if (!t || !me) return;
+  $("input").value = "";
+  try {
+    await addDoc(collection(db, "channels", cur, "messages"), {
+      text: t.slice(0, 2000),
+      uid: me.uid,
+      name: me.name,
+      timestamp: serverTimestamp()
+    });
+  } catch(err){
+    console.error(err);
+    $("err").textContent = "Не удалось отправить: " + err.message;
+  }
+};
+
+$("back").onclick = () => appEl.classList.remove("open");
+$("out").onclick  = () => { signOut(auth).catch(e => console.error(e)); };
+
+function closeProfile(){ $("modal").hidden = true; draft = null; }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeProfile(); });
+$("modal").addEventListener("click", (e) => { if (e.target === $("modal")) closeProfile(); });
+$("meBtn").onclick = () => openProfile(me.uid, me.name);
+
+function resize(file, cb){
+  const r = new FileReader();
+  r.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const s = 128, c = document.createElement("canvas");
+      c.width = c.height = s;
+      const k = Math.max(s / img.width, s / img.height);
+      const w = img.width * k, h = img.height * k;
+      c.getContext("2d").drawImage(img, (s - w)/2, (s - h)/2, w, h);
+      cb(c.toDataURL("image/jpeg", 0.8));
+    };
+    img.onerror = () => cb(null);
+    img.src = r.result;
+  };
+  r.onerror = () => cb(null);
+  r.readAsDataURL(file);
+}
+
+function openProfile(uid, displayName){
+  const acc  = usersMap.get(uid) || (me && uid === me.uid ? me : null);
+  const mine = me && uid === me.uid;
+  const box  = $("pcard"); box.innerHTML = ""; $("modal").hidden = false;
+  const pf = el("div","pf");
+  const av = el("div","ava l");
+  const nm = el("h2", null, acc ? acc.name : displayName);
+  pf.appendChild(av); pf.appendChild(nm);
+  if (!mine){
+    paint(av, acc, displayName);
+    pf.appendChild(el("p", null, acc ? (acc.bio || "Описание не указано.") : "Аккаунт не найден."));
+    box.appendChild(pf);
+    const c1 = el("button","btn ghost full","Закрыть");
+    c1.type = "button"; c1.onclick = closeProfile;
+    box.appendChild(c1); c1.focus(); return;
+  }
+  draft = { avatar: acc ? (acc.avatar || "") : "" };
+  nm.textContent = "Мой профиль";
+  box.appendChild(pf);
+  const gb = [];
+  function sync(){
+    paint(av, draft, me.name);
+    gb.forEach(b => b.setAttribute("aria-pressed", String(b.textContent === draft.avatar)));
+  }
+  const file = el("input"); file.type = "file"; file.accept = "image/*"; file.hidden = true;
+  const up   = el("button","btn ghost full","Загрузить фото"); up.type = "button";
+  up.onclick = () => file.click();
+  const err = el("p","err"); err.setAttribute("role","alert");
+  file.onchange = () => {
+    const f = file.files[0]; if (!f) return;
+    err.textContent = "";
+    resize(f, (d) => {
+      if (!d){ err.textContent = "Не удалось открыть изображение."; return; }
+      draft.avatar = d; sync();
+    });
+  };
+  box.appendChild(file); box.appendChild(up);
+  box.appendChild(el("p", null, "Или выберите значок:")).style.margin = ".8rem 0 0";
+  const gl = el("div","glyphs");
+  GLYPHS.forEach(g => {
+    const b = el("button","g", g); b.type = "button";
+    b.setAttribute("aria-label","Значок " + g);
+    b.onclick = () => { draft.avatar = g; sync(); };
+    gb.push(b); gl.appendChild(b);
+  });
+  box.appendChild(gl);
+  const reset = el("button","sm","Сбросить аватарку"); reset.type = "button";
+  reset.onclick = () => { draft.avatar = ""; sync(); };
+  box.appendChild(reset);
+  const lab = el("label", null, "Описание"); lab.style.marginTop = "1rem";
+  const ta  = el("textarea"); ta.rows = 3; ta.maxLength = 200; ta.value = acc ? (acc.bio || "") : "";
+  lab.appendChild(ta);
+  box.appendChild(lab); box.appendChild(err);
+  const row = el("div","row");
+  const save   = el("button","btn","Сохранить");
+  const cancel = el("button","btn ghost","Отмена");
+  save.type = "button"; cancel.type = "button"; cancel.onclick = closeProfile;
+  save.onclick = async () => {
+    save.disabled = true;
+    try {
+      await setDoc(doc(db, "users", me.uid), {
+        avatar: draft.avatar,
+        bio: ta.value.trim().slice(0, 200)
+      }, { merge: true });
+      me.avatar = draft.avatar;
+      me.bio    = ta.value.trim().slice(0, 200);
+      closeProfile();
+    } catch(e){
+      err.textContent = "Не удалось сохранить: " + e.message;
+    } finally { save.disabled = false; }
+  };
+  row.appendChild(save); row.appendChild(cancel); box.appendChild(row);
+  sync();
+}
+
+function hidePw(){
+  $("eye").setAttribute("aria-pressed","false");
+  $("eye").textContent = "Показать пароль";
+  $("p").type = "password"; $("p2").type = "password";
+}
+$("eye").addEventListener("click", function(){
+  const show = $("eye").getAttribute("aria-pressed") !== "true";
+  $("eye").setAttribute("aria-pressed", String(show));
+  $("eye").textContent = show ? "Скрыть пароль" : "Показать пароль";
+  $("p").type  = show ? "text" : "password";
+  $("p2").type = show ? "text" : "password";
+});
+function setMode(m){
+  mode = m;
+  $("tabIn").setAttribute("aria-selected", m === "in");
+  $("tabUp").setAttribute("aria-selected", m === "up");
+  $("tabAd").setAttribute("aria-selected", m === "ad");
+  $("u").parentNode.hidden = m === "ad"; $("u").required = m !== "ad";
+  $("p2row").hidden = m !== "up"; $("p2").required = m === "up";
+  $("p").autocomplete = m === "up" ? "new-password" : "current-password";
+  $("authBtn").textContent = m === "up" ? "Создать аккаунт" : m === "ad" ? "Открыть" : "Войти";
+  $("err").textContent = "";
+}
+$("tabIn").addEventListener("click", () => setMode("in"));
+$("tabUp").addEventListener("click", () => setMode("up"));
+$("tabAd").addEventListener("click", () => setMode("ad"));
+
+function adminToggle(on){
+  [".tabs","#authForm",".note","#intro"].forEach(s => { document.querySelector(s).hidden = on; });
+  $("adminView").hidden = !on;
+}
+async function showAdmin(){
+  adminToggle(true);
+  $("adCount").textContent = "Загрузка…";
+  $("adList").innerHTML = "";
+  try {
+    const snap = await getDocs(collection(db, "users"));
+    const users = [];
+    snap.forEach(d => users.push({ id: d.id, ...d.data() }));
+    users.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
+    const ul = $("adList"); ul.innerHTML = "";
+    users.forEach(u => {
+      const li = el("li");
+      const a  = el("span","ava s"); paint(a, u, u.name);
+      li.appendChild(a);
+      li.appendChild(el("span","n", u.name));
+      ul.appendChild(li);
+    });
+    ul.hidden = !users.length;
+    $("adCount").textContent = users.length
+      ? "Всего аккаунтов: " + users.length
+      : "Аккаунтов пока нет.";
+  } catch(err){
+    console.error(err);
+    $("adCount").textContent = "Ошибка загрузки: " + err.message;
+  }
+}
+$("adOut").addEventListener("click", () => { adminToggle(false); setMode("in"); });
+
+$("authForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const err = $("err"); err.textContent = "";
+  const name = $("u").value.trim();
+  const pw   = $("p").value;
+
+  if (!window.crypto || !crypto.subtle){
+    err.textContent = "Браузер не поддерживает безопасный вход."; return;
+  }
+  if (mode === "ad"){
+    const h = await sha256hex(ADSALT + ":" + pw);
+    if (h !== ADHASH){ err.textContent = "Неверный пароль администратора."; return; }
+    $("authForm").reset(); hidePw(); showAdmin(); return;
+  }
+  if (!/^[A-Za-zА-Яа-яЁё0-9_.-]{3,24}$/.test(name)){
+    err.textContent = "Имя: 3–24 символа, буквы, цифры, _ . -"; return;
+  }
+  if (pw.length < 6){
+    err.textContent = "Пароль должен быть не короче 6 символов."; return;
+  }
+  const email = await nameToEmail(name);
+  try {
+    if (mode === "up"){
+      if (pw !== $("p2").value){ err.textContent = "Пароли не совпадают."; return; }
+      const cred = await createUserWithEmailAndPassword(auth, email, pw);
+      await setDoc(doc(db, "users", cred.user.uid), {
+        name,
+        nameLower: name.toLowerCase(),
+        avatar: "",
+        bio: "",
+        createdAt: serverTimestamp()
+      });
+      $("authForm").reset(); hidePw();
+    } else {
+      await signInWithEmailAndPassword(auth, email, pw);
+      $("authForm").reset(); hidePw();
+    }
+  } catch(e){
+    const code = e.code || "";
+    if (code.includes("email-already-in-use"))          err.textContent = "Такое имя уже занято.";
+    else if (code.includes("user-not-found") ||
+             code.includes("invalid-credential") ||
+             code.includes("wrong-password"))            err.textContent = "Неверное имя или пароль.";
+    else if (code.includes("weak-password"))             err.textContent = "Пароль слишком простой.";
+    else if (code.includes("invalid-email"))             err.textContent = "Имя содержит недопустимые символы.";
+    else if (code.includes("too-many-requests"))         err.textContent = "Слишком много попыток. Подождите.";
+    else if (code.includes("network-request-failed"))    err.textContent = "Нет связи с сервером. Проверьте интернет.";
+    else                                                 err.textContent = "Ошибка: " + (e.message || code);
+  }
+});
+
+renderList();
+setMode("in");
+$("u").focus();
 </script>
 </body>
 </html>
