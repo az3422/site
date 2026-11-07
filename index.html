@@ -171,21 +171,18 @@ button.ava:hover{background-color:var(--dim)}
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app");
 
-  /* ================= FIREBASE (только для сообщений/админки) =================
-     ВСТАВЬ СВОИ КЛЮЧИ ИЗ FIREBASE CONSOLE:
-     Project settings → General → Your apps → </> Web → firebaseConfig
-  */
+  
   var firebaseConfig = {
     apiKey:            "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
     authDomain:        "divine-net.firebaseapp.com",
     projectId:         "divine-net",
     storageBucket:     "divine-net.firebasestorage.app",
     messagingSenderId: "477692936922",
-    appId:             "ВСТАВЬ_APP_ID"
+    appId:             "1:477692936922:web:fdd8daab2a89c588f91be3"
   };
   var fbReady=false, fbdb=null;
   var unsubMsgs=null, unsubUsers=null;
-  var remoteUsers={};   // профили из Firestore (для отображения в чате/профилях)
+  var remoteUsers={};   
   try{
     if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
       firebase.initializeApp(firebaseConfig);
@@ -215,12 +212,23 @@ button.ava:hover{background-color:var(--dim)}
       }, function(e){ console.error("messages:",e); });
   }
 
+  
   function subscribeUsers(){
     if(!fbReady) return;
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
+    /* Сразу тянем всё принудительно (сработает даже если onSnapshot тормозит) */
+    fbdb.collection("users").get().then(function(snap){
+      var tmp={};
+      snap.forEach(function(d){ tmp[d.id]=d.data(); });
+      remoteUsers=tmp;
+      if(me) renderMe();
+      renderMsgs();
+    }).catch(function(e){ console.error("users.get:",e); });
+    /* И параллельно подписка на обновления */
     unsubUsers = fbdb.collection("users").onSnapshot(function(snap){
-      remoteUsers={};
-      snap.forEach(function(d){ remoteUsers[d.id]=d.data(); });
+      var tmp={};
+      snap.forEach(function(d){ tmp[d.id]=d.data(); });
+      remoteUsers=tmp;
       if(me) renderMe();
       renderMsgs();
     }, function(e){ console.error("users:",e); });
@@ -339,7 +347,30 @@ button.ava:hover{background-color:var(--dim)}
     r.onerror=function(){ cb(null); };
     r.readAsDataURL(file);
   }
+
+  /* ===== ФУНКЦИЯ ИЗМЕНЕНА: добавлен fallback через get() ===== */
   function openProfile(key,name){
+    /* Если профиль ещё не подгружен — тянем его напрямую из Firestore */
+    if(!getAcc(key) && fbReady){
+      var _box=$("pcard"); _box.innerHTML=""; $("modal").hidden=false;
+      _box.appendChild(el("p","empty","Загрузка профиля…"));
+      fbdb.collection("users").doc(key).get().then(function(d){
+        if(d.exists){
+          remoteUsers[key]=d.data();
+          openProfile(key,name);
+        } else {
+          _box.innerHTML="";
+          var pf2=el("div","pf");
+          var av2=el("div","ava l"); paint(av2,null,name); pf2.appendChild(av2);
+          pf2.appendChild(el("h2",null,name));
+          pf2.appendChild(el("p",null,"Аккаунт не найден."));
+          _box.appendChild(pf2);
+          var c2=el("button","btn ghost full","Закрыть"); c2.type="button"; c2.onclick=closeProfile; _box.appendChild(c2);
+        }
+      }).catch(function(e){ console.error("openProfile.get:",e); });
+      return;
+    }
+
     var acc=getAcc(key), mine=!!(me&&key===me.key&&acc), box=$("pcard");
     box.innerHTML=""; $("modal").hidden=false;
     var pf=el("div","pf"), av=el("div","ava l"), nm=el("h2",null,acc?acc.name:name);
@@ -415,7 +446,7 @@ button.ava:hover{background-color:var(--dim)}
     $("adminView").hidden=!on;
   }
   function showAdmin(){
-    
+    /* Если Firebase подключён — показываем ВСЕХ со всех устройств */
     if(fbReady){
       adminToggle(true);
       $("adCount").textContent="Загрузка…";
@@ -478,7 +509,7 @@ button.ava:hover{background-color:var(--dim)}
       hash(pw,salt).then(function(h){
         all[key]={name:name,salt:salt,hash:h,avatar:"",bio:""};
         if(!wr(USERS,all)){ err.textContent="Не удалось сохранить аккаунт."; return; }
-        
+        /* Дублируем в Firestore, чтобы админка и другие пользователи видели профиль */
         fbSaveUser(key, { name: name, avatar: "", bio: "" });
         $("authForm").reset(); enter(name);
       });
