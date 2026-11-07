@@ -129,7 +129,7 @@ button.ava:hover{background-color:var(--dim)}
       <ul class="adl" id="adList"></ul>
       <button class="btn full" type="button" id="adOut">Закрыть</button>
     </div>
-    <p class="note">Аккаунты хранятся только в этом браузере. На другом устройстве их не будет.</p>
+    <p class="note"></p>
   </div>
 </div>
 
@@ -389,10 +389,58 @@ button.ava:hover{background-color:var(--dim)}
   });
 
   try{
-    var s=localStorage.getItem(SESSION), a=s&&users()[s.toLowerCase()];
+<!-- ПОДКЛЮЧАЕМ СЕТЬ FIREBASE -->
+<script src="https://gstatic.com"></script>
+<script src="https://gstatic.com"></script>
+
+<script>
+
+const firebaseConfig = {
+
+  apiKey: "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
+
+  authDomain: "divine-net.firebaseapp.com",
+
+  projectId: "divine-net",
+
+  storageBucket: "divine-net.firebasestorage.app",
+
+  messagingSenderId: "477692936922",
+
+  appId: "1:477692936922:web:fdd8daab2a89c588f91be3",
+
+  measurementId: "G-6M33RTRHML"
+
+};
+
+
+firebase.initializeApp(firebaseConfig);
+window.db = firebase.firestore(); 
+
+
+(() => {
+  try {
+    var s = localStorage.getItem(SESSION), a = s && users()[s.toLowerCase()];
     if(a) enter(a.name);
-  }catch(e){}
+  } catch(e) {}
 })();
+
+
+window.db.collection("messages").orderBy("createdAt", "asc").onSnapshot((snapshot) => {
+  
+  const chatWindow = document.querySelector(".messages") || document.getElementById("chat-window");
+  if (!chatWindow) return;
+  
+  chatWindow.innerHTML = ""; // 
+
+  snapshot.forEach((doc) => {
+    const message = doc.data();
+    
+    const msgHtml = `<div class="message"><b>${message.name}:</b> ${message.text}</div>`;
+    chatWindow.insertAdjacentHTML('beforeend', msgHtml);
+  });
+  chatWindow.scrollTop = chatWindow.scrollHeight; 
+});
 </script>
 </body>
 </html>
