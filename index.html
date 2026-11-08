@@ -265,7 +265,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var MUTE_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var FORUM_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:middle;margin-right:.4rem" aria-hidden="true"><path d="M3 4h18v2H3V4zm0 5h18v2H3V9zm0 5h18v2H3v-2z"/></svg>';
-  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="", swapUntil=0;
+  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="", swapUntil=0, loadedCh={};
 
   
   var firebaseConfig = {
@@ -306,9 +306,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
           });
         });
         arr.reverse();
+        loadedCh[channelId]=true;
         data[channelId]=arr;
         if(cur===channelId) renderMsgs();
-      }, function(e){ console.error("messages:",e); });
+      }, function(e){ console.error("messages:",e); loadedCh[channelId]=true; if(cur===channelId) renderMsgs(); });
   }
 
   
@@ -494,7 +495,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function rd(k,d){ try{ var v=JSON.parse(localStorage.getItem(k)); return v==null?d:v; }catch(e){ return d; } }
   function wr(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
   function users(){ var u=rd(USERS,{}); return u&&typeof u==="object"&&!Array.isArray(u)?u:{}; }
-  function loadData(){ var d=rd(SRV,{}); data={}; CH.forEach(function(c){ data[c.id]=d&&Array.isArray(d[c.id])?d[c.id]:[]; }); }
+  function loadData(){ var d=fbReady?{}:rd(SRV,{}); data={}; loadedCh={}; CH.forEach(function(c){ data[c.id]=d&&Array.isArray(d[c.id])?d[c.id]:[]; }); }
   function hash(pw,salt){
     return crypto.subtle.digest("SHA-256",new TextEncoder().encode(salt+":"+pw)).then(function(b){
       return Array.prototype.map.call(new Uint8Array(b),function(x){return ("0"+x.toString(16)).slice(-2)}).join("");
@@ -508,7 +509,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     else el.textContent=(name||"?").charAt(0).toUpperCase();
   }
   function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
-  function getAcc(key){ return remoteUsers[key] || users()[key] || null; }
+  function getAcc(key){ return fbReady ? (remoteUsers[key]||null) : (users()[key]||null); }
 
   /* ---------- мессенджер ---------- */
   function chan(){ return CH.filter(function(c){return c.id===cur})[0]; }
@@ -534,7 +535,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     var near=box.scrollHeight-box.scrollTop-box.clientHeight<80, stick=!!force||near;
     $("topName").textContent="# "+c.name; $("topSub").textContent=c.sub; $("input").placeholder="Написать в #"+c.name; applyComposer();
     box.innerHTML="";
-    if(!list.length) box.appendChild(el("p","empty",canWrite()?"Здесь пока тихо. Напишите первым.":(READONLY[cur]?"Здесь пока нет публикаций.":"Здесь пока тихо.")));
+    if(fbReady&&!loadedCh[cur]) box.appendChild(el("p","empty","Загрузка…"));
+    else if(!list.length) box.appendChild(el("p","empty",canWrite()?"Здесь пока тихо. Напишите первым.":(READONLY[cur]?"Здесь пока нет публикаций.":"Здесь пока тихо.")));
     list.forEach(function(m){
       var acc=getAcc(m.by), name=acc?acc.name:m.name, row=el("div","m");
       var a=el("button","ava"); a.type="button"; paint(a,acc,name); a.setAttribute("aria-label","Профиль: "+name);
@@ -575,7 +577,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     applyComposer();
     box.innerHTML="";
     if(!list.length){
-      box.appendChild(el("p","empty",canWrite()?"Здесь пока нет постов. Создайте первый.":"Здесь пока нет постов."));
+      box.appendChild(el("p","empty",(fbReady&&!loadedCh[cur])?"Загрузка…":(canWrite()?"Здесь пока нет постов. Создайте первый.":"Здесь пока нет постов.")));
       animateIn(box,false,false);
       return;
     }
