@@ -94,6 +94,15 @@ button.ava:hover{background-color:var(--dim)}
 .mlist .bn{flex:1;padding:.4rem .5rem}
 .adl li{flex-wrap:wrap}
 .acts{flex-basis:100%;display:flex;gap:.4rem;flex-wrap:wrap;padding-left:2.6rem}
+.clip{display:grid;place-items:center;padding:.6rem .9rem}
+.locked{padding:.95rem 1.25rem;text-align:center;font-weight:500;border-top:2px solid var(--fg)}
+.serr{margin:0;padding:.5rem 1.25rem;font-weight:500;border-top:2px solid var(--fg)}
+.prev{display:flex;align-items:center;gap:.8rem;padding:.6rem 1.25rem;border-top:2px solid var(--fg)}
+.prev img{height:3.5rem;border-radius:.5rem;border:2px solid var(--fg)}
+.picb{background:none;border:0;padding:0;display:block;margin-top:.3rem;cursor:zoom-in}
+.pic{display:block;max-width:min(100%,360px);max-height:360px;border:2px solid var(--fg);border-radius:.8rem}
+.big{display:block;max-width:100%;max-height:75vh;margin:0 auto;border-radius:.6rem}
+.card.wide{max-width:min(92vw,60rem);padding:1rem}
 .side{border-right:2px solid var(--fg);display:flex;flex-direction:column;min-height:0}
 .side h1{font-weight:800;font-size:1.3rem;letter-spacing:-.02em;padding:1.1rem 1.25rem;border-bottom:2px solid var(--fg)}
 .cat{padding:.9rem 1.25rem .3rem;font-size:.85rem;font-weight:500;opacity:.7}
@@ -185,8 +194,13 @@ button.ava:hover{background-color:var(--dim)}
       <button class="sm membtn" id="memBtn" type="button">Участники</button>
     </div>
     <div class="msgs" id="msgs" aria-live="polite"></div>
+    <p class="serr" id="serr" role="alert" hidden></p>
+    <div class="prev" id="prev" hidden><img id="prevImg" alt="Выбранное фото"><button type="button" class="sm" id="prevX">Убрать</button></div>
+    <div class="locked" id="locked" hidden>Следите за новостями</div>
     <form class="sendbar" id="form" autocomplete="off">
       <input type="text" id="input" aria-label="Сообщение" maxlength="2000">
+      <input type="file" id="file" accept="image/*" hidden>
+      <button class="btn ghost clip" type="button" id="clip" aria-label="Прикрепить фото" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
       <button class="btn" type="submit">Отправить</button>
     </form>
   </section>
@@ -207,7 +221,7 @@ button.ava:hover{background-color:var(--dim)}
   var $=function(id){return document.getElementById(id)};
   var USERS="divine-net-users-v1", SESSION="divine-net-session-v1", SRV="divine-net-server-v1";
   var ADSALT="divine-admin", ADHASH="cd0159aca7bbdb576d4beec4912e52a6bbd97f1205510b3c2a03e829b1c75208";
-  var CH=[{id:"announcements",name:"announcements",sub:"Новости сервера"},{id:"general",name:"general",sub:"Общий чат"}];
+  var CH=[{id:"announcements",name:"announcements",sub:"Новости сервера"},{id:"general",name:"general",sub:"Общий чат"},{id:"media",name:"media",sub:"Фотографии"}];
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app");
 
@@ -221,7 +235,7 @@ button.ava:hover{background-color:var(--dim)}
     appId:             "1:477692936922:web:fdd8daab2a89c588f91be3"
   };
   var fbReady=false, fbdb=null;
-  var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=90000, roles={}, bans={}, unsubRoles=null, unsubBans=null, pendMsg=null, pendBan=null;
+  var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=90000, roles={}, bans={}, unsubRoles=null, unsubBans=null, pendMsg=null, pendBan=null, pendImg=null;
   var remoteUsers={};   
   try{
     if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
@@ -235,7 +249,7 @@ button.ava:hover{background-color:var(--dim)}
     if(!fbReady) return;
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     unsubMsgs = fbdb.collection("channels").doc(channelId).collection("messages")
-      .orderBy("createdAt","asc").limit(500)
+      .orderBy("createdAt","desc").limit(channelId==="media"?20:200)
       .onSnapshot(function(snap){
         var arr=[];
         snap.forEach(function(d){
@@ -245,9 +259,11 @@ button.ava:hover{background-color:var(--dim)}
             by: x.by,
             name: x.name,
             text: x.text,
+            image: x.image||"",
             t: x.createdAt ? x.createdAt.toDate().getTime() : Date.now()
           });
         });
+        arr.reverse();
         data[channelId]=arr;
         if(cur===channelId) renderMsgs();
       }, function(e){ console.error("messages:",e); });
@@ -454,10 +470,10 @@ button.ava:hover{background-color:var(--dim)}
   function renderMe(){ var acc=getAcc(me.key); paint($("meAva"),acc,me.name); $("who").textContent=me.name; }
   function renderMsgs(force){
     var c=chan(), box=$("msgs"), list=data[cur]||[];
-    var near=box.scrollHeight-box.scrollTop-box.clientHeight<80;
-    $("topName").textContent="# "+c.name; $("topSub").textContent=c.sub; $("input").placeholder="Написать в #"+c.name;
+    var near=box.scrollHeight-box.scrollTop-box.clientHeight<80, stick=!!force||near;
+    $("topName").textContent="# "+c.name; $("topSub").textContent=c.sub; $("input").placeholder="Написать в #"+c.name; applyComposer();
     box.innerHTML="";
-    if(!list.length) box.appendChild(el("p","empty","Здесь пока тихо. Напишите первым."));
+    if(!list.length) box.appendChild(el("p","empty",canWrite()?"Здесь пока тихо. Напишите первым.":"Здесь пока нет новостей."));
     list.forEach(function(m){
       var acc=getAcc(m.by), name=acc?acc.name:m.name, row=el("div","m");
       var a=el("button","ava"); a.type="button"; paint(a,acc,name); a.setAttribute("aria-label","Профиль: "+name);
@@ -467,7 +483,13 @@ button.ava:hover{background-color:var(--dim)}
       h.appendChild(n);
       if(isAdmin(m.by)){ n.classList.add("adm"); n.setAttribute("aria-label",name+", админ"); }
       h.appendChild(el("time",null,new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
-      b.appendChild(h); b.appendChild(el("p",null,m.text)); row.appendChild(a); row.appendChild(b);
+      b.appendChild(h); if(m.text) b.appendChild(el("p",null,m.text));
+      if(okImg(m.image)){
+        var ib=el("button","picb"), im=el("img","pic"); ib.type="button"; ib.setAttribute("aria-label","Открыть фото");
+        im.src=m.image; im.alt="Фото от "+name; im.onload=function(){ if(stick) box.scrollTop=box.scrollHeight; };
+        ib.onclick=function(){ openImage(m.image); }; ib.appendChild(im); b.appendChild(ib);
+      }
+      row.appendChild(a); row.appendChild(b);
       if(fbReady&&amAdmin()&&m.id){
         var x=el("button","sm delmsg",pendMsg===m.id?"Удалить?":"×"); x.type="button";
         x.setAttribute("aria-label","Удалить сообщение");
@@ -491,15 +513,59 @@ button.ava:hover{background-color:var(--dim)}
     if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); }
     hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
   }
+  function canWrite(){ return cur!=="announcements"||!fbReady||amAdmin(); }
+  function clearAttach(){ pendImg=null; $("prev").hidden=true; $("prevImg").removeAttribute("src"); $("file").value=""; }
+  var serrT=null;
+  function sendErr(msg){ var e=$("serr"); e.textContent=msg; e.hidden=false; clearTimeout(serrT); serrT=setTimeout(function(){ e.hidden=true; },5000); }
+  function applyComposer(){
+    var w=canWrite(), media=cur==="media"&&fbReady;
+    $("form").hidden=!w; $("locked").hidden=w;
+    $("clip").hidden=!media||!w;
+    if(!media||!w) clearAttach();
+  }
+  function shrink(file,cb){
+    var r=new FileReader();
+    r.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        var k=Math.min(1,1000/Math.max(img.width,img.height)), w=Math.max(1,Math.round(img.width*k)), h=Math.max(1,Math.round(img.height*k));
+        var c=document.createElement("canvas"); c.width=w; c.height=h;
+        var g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,w,h); g.drawImage(img,0,0,w,h);
+        var q=0.75, d=c.toDataURL("image/jpeg",q);
+        while(d.length>600000&&q>0.35){ q-=0.1; d=c.toDataURL("image/jpeg",q); }
+        cb(d.length>900000?null:d);
+      };
+      img.onerror=function(){ cb(null); };
+      img.src=r.result;
+    };
+    r.onerror=function(){ cb(null); };
+    r.readAsDataURL(file);
+  }
+  function openImage(src){
+    var box=$("pcard"); box.innerHTML=""; box.classList.add("wide"); $("modal").hidden=false;
+    var im=el("img","big"); im.src=src; im.alt="Фото"; box.appendChild(im);
+    var c=el("button","btn ghost full","Закрыть"); c.type="button"; c.style.marginTop="1rem"; c.onclick=closeProfile; box.appendChild(c); c.focus();
+  }
+  $("clip").onclick=function(){ $("file").click(); };
+  $("file").onchange=function(){
+    var f=$("file").files[0]; if(!f) return;
+    if(f.type.indexOf("image/")!==0){ sendErr("Можно прикрепить только изображение."); $("file").value=""; return; }
+    shrink(f,function(d){
+      if(!d){ sendErr("Не удалось загрузить фото. Попробуйте другое."); $("file").value=""; return; }
+      pendImg=d; $("prevImg").src=d; $("prev").hidden=false;
+    });
+  };
+  $("prevX").onclick=clearAttach;
   $("form").onsubmit=function(e){
     e.preventDefault();
-    var t=$("input").value.trim(); if(!t||!me) return;
+    var t=$("input").value.trim(), img=(cur==="media"&&fbReady)?pendImg:null;
+    if((!t&&!img)||!me||!canWrite()) return;
     if(fbReady){
-      fbdb.collection("channels").doc(cur).collection("messages").add({
-        by: me.key, name: me.name, text: t.slice(0,2000),
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(function(err){ console.error("send:",err); });
-      $("input").value="";
+      var doc={by:me.key,name:me.name,text:t.slice(0,2000),createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+      if(img) doc.image=img;
+      fbdb.collection("channels").doc(cur).collection("messages").add(doc)
+        .catch(function(err){ console.error("send:",err); sendErr("Не удалось отправить. Попробуйте ещё раз."); });
+      $("input").value=""; clearAttach();
       return;
     }
     loadData(); data[cur].push({by:me.key,name:me.name,text:t,t:Date.now()});
@@ -526,7 +592,7 @@ button.ava:hover{background-color:var(--dim)}
   });
 
   /* ---------- профиль ---------- */
-  function closeProfile(){ $("modal").hidden=true; draft=null; }
+  function closeProfile(){ $("modal").hidden=true; $("pcard").classList.remove("wide"); draft=null; }
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeProfile(); });
   $("modal").addEventListener("click",function(e){ if(e.target===$("modal")) closeProfile(); });
   $("meBtn").onclick=function(){ openProfile(me.key,me.name); };
