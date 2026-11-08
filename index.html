@@ -157,6 +157,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .m time{font-size:.78rem;opacity:.6}
 .m p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
 .empty{margin:2rem auto;text-align:center;opacity:.7}
+@keyframes msgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .fcard{border:2px solid var(--fg);border-radius:1rem;padding:.9rem 1rem;margin:0 0 .8rem;display:flex;flex-direction:column;gap:.5rem;transition:background .15s,transform .15s}
 .fcard:hover{background:var(--dim)}
 .fcard .fh{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
@@ -264,7 +265,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var MUTE_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var FORUM_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:middle;margin-right:.4rem" aria-hidden="true"><path d="M3 4h18v2H3V4zm0 5h18v2H3V9zm0 5h18v2H3v-2z"/></svg>';
-  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="";
+  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="", swapUntil=0;
 
   
   var firebaseConfig = {
@@ -521,7 +522,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         var li=el("li",c.id===cur?"on":""), b=el("button"); b.type="button";
         if(c.forum){ b.innerHTML=FORUM_SVG; b.appendChild(document.createTextNode(c.name)); }
         else { b.textContent="# "+c.name; }
-        b.onclick=function(){ cur=c.id; app.classList.add("open"); if(fbReady) subscribeMessages(cur); render(true); $("input").focus(); };
+        b.onclick=function(){ cur=c.id; app.classList.add("open"); if(fbReady) subscribeMessages(cur); swapUntil=Date.now()+1500; render(true); $("input").focus(); };
         li.appendChild(b); ul.appendChild(li);
       });
     });
@@ -564,6 +565,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       box.appendChild(row);
     });
     if(force||near) box.scrollTop=box.scrollHeight;
+    animateIn(box,true,list.length>0);
   }
   function renderForum(force){
     var c=chan(), box=$("msgs"), list=data[cur]||[];
@@ -574,6 +576,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     box.innerHTML="";
     if(!list.length){
       box.appendChild(el("p","empty",canWrite()?"Здесь пока нет постов. Создайте первый.":"Здесь пока нет постов."));
+      animateIn(box,false,false);
       return;
     }
     var posts=list.slice().reverse();
@@ -611,6 +614,18 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       box.appendChild(card);
     });
     if(force) box.scrollTop=0;
+    animateIn(box,false,true);
+  }
+  /* Плавное появление сообщений после переключения канала или форума */
+  function animateIn(box,fromEnd,hasContent){
+    if(Date.now()>swapUntil) return;
+    if(hasContent) swapUntil=0;
+    if(window.matchMedia&&matchMedia("(prefers-reduced-motion:reduce)").matches) return;
+    var kids=box.children, n=kids.length, lim=14;
+    for(var i=0;i<n;i++){
+      var d=fromEnd?Math.max(0,i-(n-lim)):Math.min(i,lim);
+      kids[i].style.animation="msgIn .38s cubic-bezier(.2,.7,.3,1) "+(d*35)+"ms backwards";
+    }
   }
   function render(force){ renderList(); renderMe(); renderMembers(); renderMsgs(force); }
 
