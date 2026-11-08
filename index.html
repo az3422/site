@@ -40,13 +40,17 @@ button.ava:hover{background-color:var(--dim)}
 .sm:hover,.sm[aria-pressed=true]{background:var(--fg);color:var(--bg)}
 .sm.danger{border-color:#ff4d4d;color:#ff4d4d}
 .sm.danger:hover{background:#ff4d4d;color:#fff;border-color:#ff4d4d}
-.lang-btn{position:absolute;top:1rem;right:1rem;z-index:2;font-size:.75rem;padding:.2rem .55rem;min-height:auto;letter-spacing:.05em}
+
+.top-actions{position:absolute;top:1rem;right:1rem;z-index:2;display:flex;gap:.4rem}
+.top-actions .sm{font-size:.75rem;padding:.2rem .55rem;min-height:auto;letter-spacing:.05em}
+.top-actions .sm.icon-btn{font-family:var(--display);font-weight:800;font-size:.85rem;padding:.2rem .5rem}
 
 .auth,.modal{position:fixed;inset:0;z-index:5;background:var(--bg);display:grid;place-items:center;padding:1.25rem;overflow-y:auto;overflow-x:hidden}
 .auth::before{content:"";position:fixed;top:50%;left:50%;width:130vmin;height:130vmin;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.16) 0%,rgba(255,255,255,.07) 28%,transparent 62%);filter:blur(60px);pointer-events:none;animation:authHalo 5.5s ease-in-out infinite}
 @keyframes authHalo{0%,100%{opacity:.65;transform:translate(-50%,-50%) scale(.96)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}}
 .modal{background:rgba(0,0,0,.88);z-index:8}
 .card{width:100%;max-width:24rem;border:2px solid var(--fg);border-radius:1.1rem;padding:1.75rem;background:var(--bg)}
+.card.wide{max-width:min(92vw,34rem)}
 .auth .card{position:relative;z-index:1;background:rgba(8,8,8,.6);-webkit-backdrop-filter:blur(28px) saturate(160%);backdrop-filter:blur(28px) saturate(160%);box-shadow:0 30px 90px rgba(0,0,0,.75),0 0 60px rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.04);animation:cardGlow 4s ease-in-out infinite}
 @keyframes cardGlow{0%,100%{box-shadow:0 30px 90px rgba(0,0,0,.75),0 0 50px rgba(255,255,255,.05),0 0 90px rgba(255,255,255,.04),inset 0 1px 0 rgba(255,255,255,.04)}50%{box-shadow:0 30px 90px rgba(0,0,0,.75),0 0 90px rgba(255,255,255,.13),0 0 160px rgba(255,255,255,.08),inset 0 1px 0 rgba(255,255,255,.07)}}
 .card h1{font-weight:800;font-size:1.8rem;letter-spacing:-.03em;margin-bottom:.4rem}
@@ -83,6 +87,29 @@ button.ava:hover{background-color:var(--dim)}
 .row{display:flex;gap:.6rem;margin-top:.5rem}
 .row .btn{flex:1}
 
+/* Info modal */
+.info-row{display:flex;align-items:flex-start;gap:.7rem;padding:.6rem 0;border-bottom:1px dashed rgba(255,255,255,.1)}
+.info-row:last-child{border-bottom:0}
+.info-row .info-text{flex:1;min-width:0;font-size:.88rem;line-height:1.4;opacity:.9}
+.info-row .info-text b{display:block;margin-bottom:.15rem;font-weight:500;opacity:.75;font-size:.82rem}
+.info-section{margin-top:1rem}
+.info-section h3{font-family:var(--display);font-weight:500;font-size:1rem;margin:0 0 .5rem;padding-top:.8rem;border-top:2px solid var(--fg)}
+.info-section:first-of-type h3{border-top:0;padding-top:0}
+
+.role-badge{display:inline-block;padding:.15rem .6rem;border:2px solid;border-radius:999px;font-weight:600;font-size:.75rem;letter-spacing:.02em;white-space:nowrap;flex:none;font-family:var(--display);line-height:1.35}
+.role-user{color:#fff;border-color:#fff;background:rgba(255,255,255,.06)}
+.role-mod{color:transparent;-webkit-text-fill-color:transparent;-webkit-background-clip:text;background-clip:text;background-size:300% auto;animation:shimmer 3.2s linear infinite;background-image:linear-gradient(90deg,#2f7bff,#a8ccff,#2f7bff,#a8ccff,#2f7bff);border-color:#2f7bff}
+.role-admin{color:transparent;-webkit-text-fill-color:transparent;-webkit-background-clip:text;background-clip:text;background-size:300% auto;animation:shimmer 3.2s linear infinite;background-image:linear-gradient(90deg,#ff3b3b,#ffb0b0,#ff3b3b,#ffb0b0,#ff3b3b);border-color:#ff3b3b}
+
+.ping-badge{display:inline-block;padding:.15rem .55rem;border-radius:.4rem;font-weight:600;font-size:.82rem;white-space:nowrap;flex:none;font-family:var(--text)}
+.ping-everyone{color:#fbbf24;background:rgba(251,191,36,.18)}
+.ping-user{color:#c084fc;background:rgba(168,85,247,.18)}
+.ping-msg{color:#fff;background:rgba(255,255,255,.1)}
+.ping-hl{width:1.1rem;height:1.1rem;border-radius:50%;flex:none}
+.ping-hl.white{background:linear-gradient(90deg,#fff,#c8c8c8,#fff)}
+.ping-hl.purple{background:linear-gradient(90deg,#a855f7,#e879f9,#c084fc)}
+.ping-hl.yellow{background:linear-gradient(90deg,#fbbf24,#fde68a,#fbbf24)}
+
 .app{display:grid;grid-template-columns:300px 1fr 240px;height:100%;border:2px solid var(--fg)}
 .mem{border-left:2px solid var(--fg);display:flex;flex-direction:column;min-height:0}
 .mem h2{font-family:var(--text);font-weight:500;font-size:.95rem;padding:1.1rem 1.1rem .5rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
@@ -102,7 +129,7 @@ button.ava:hover{background-color:var(--dim)}
 .mod{background-image:linear-gradient(90deg,#2f7bff,#a8ccff,#2f7bff,#a8ccff,#2f7bff)}
 .adm .bdg,.mod .bdg{color:var(--fg);-webkit-text-fill-color:var(--fg)}
 @keyframes shimmer{from{background-position:0% center}to{background-position:300% center}}
-@media (prefers-reduced-motion:reduce){.adm,.mod,h1{animation:none}h1{background-image:linear-gradient(90deg,#fff,#888,#fff)}.list li.unread button::before,.list li.mention-unread button::before,.list li.everyone-unread button::before{animation:none}}
+@media (prefers-reduced-motion:reduce){.adm,.mod,.role-admin,.role-mod,h1{animation:none}h1{background-image:linear-gradient(90deg,#fff,#888,#fff)}.list li.unread button::before,.list li.mention-unread button::before,.list li.everyone-unread button::before{animation:none}}
 .bdg{display:inline-block;border:2px solid var(--fg);border-radius:999px;padding:0 .45rem;font-size:.7rem;line-height:1.35;margin-left:.4rem;font-weight:500}
 .m .b{flex:1}
 .mlist li{display:flex;align-items:center;gap:.3rem}
@@ -123,7 +150,6 @@ button.ava:hover{background-color:var(--dim)}
 .picb{background:none;border:0;padding:0;display:block;margin-top:.3rem;cursor:zoom-in}
 .pic{display:block;max-width:min(100%,360px);max-height:360px;border:2px solid var(--fg);border-radius:.8rem}
 .big{display:block;max-width:100%;max-height:75vh;margin:0 auto;border-radius:.6rem}
-.card.wide{max-width:min(92vw,60rem);padding:1rem}
 .apanel{border:2px solid var(--fg);border-radius:.8rem;padding:.9rem;margin:0 0 1rem;text-align:left}
 .apanel h3{font-family:var(--display);font-weight:500;font-size:1rem;margin:0 0 .6rem}
 .apanel .st2{margin:0 0 .5rem;opacity:1;font-weight:500}
@@ -265,13 +291,17 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   .frow input{width:100%}
   .m-actions{opacity:.55;pointer-events:auto;background:transparent;backdrop-filter:none;padding:0}
   .m-act-btn{width:1.7rem;height:1.7rem;font-size:.85rem}
+  .top-actions{top:.8rem;right:.8rem}
 }
 </style>
 </head>
 <body>
 <div class="auth" id="auth">
   <div class="card">
-    <button class="sm lang-btn" id="langBtnAuth" type="button">EN</button>
+    <div class="top-actions">
+      <button class="sm icon-btn" id="infoBtnAuth" type="button" aria-label="Информация">i</button>
+      <button class="sm" id="langBtnAuth" type="button">EN</button>
+    </div>
     <h1>DIVINE.NET</h1>
     <p id="intro" data-t="intro">Войдите или создайте аккаунт.</p>
     <div class="tabs" role="tablist">
@@ -299,7 +329,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 
 <div class="app" id="app" hidden>
   <aside class="side">
-    <button class="sm lang-btn" id="langBtnSide" type="button">EN</button>
+    <div class="top-actions">
+      <button class="sm icon-btn" id="infoBtnSide" type="button" aria-label="Информация">i</button>
+      <button class="sm" id="langBtnSide" type="button">EN</button>
+    </div>
     <h1>DIVINE.NET</h1>
     <ul class="list" id="list"></ul>
     <ul class="list" id="dmlist"></ul>
@@ -354,6 +387,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 </div>
 
 <div class="modal" id="modal" hidden><div class="card" id="pcard"></div></div>
+<div class="modal" id="infoModal" hidden><div class="card wide" id="icard"></div></div>
 <div class="ctxmenu" id="ctxMenu" hidden></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -445,7 +479,26 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       reply_to:"Ответ на: ",reply_btn:"Ответить",cancel_reply:"Отменить ответ",
       msg_not_found:"Сообщение не найдено",
       everyone_forbidden:"Только модераторы и админы могут использовать @everyone",
-      everyone_hint:"Все"
+      everyone_hint:"Все",
+      info_title:"Информация",
+      info_roles_title:"Роли",
+      info_pings_title:"Пинги",
+      info_highlights_title:"Подсветка каналов",
+      info_role_user:"Пользователь",
+      info_role_user_desc:"Пишет в каналах, отправляет фото, редактирует профиль, отвечает на сообщения и использует @упоминания.",
+      info_role_mod:"Модератор",
+      info_role_mod_desc:"Всё как у пользователя + удаление сообщений, мут, бан и пинг @everyone.",
+      info_role_admin:"Админ",
+      info_role_admin_desc:"Всё как у модератора + управление ролями, удаление аккаунтов, закрытие и удаление личных диалогов.",
+      info_ping_everyone_desc:"Упоминает всех участников. Могут писать только модераторы и админы.",
+      info_ping_user_desc:"Упоминает конкретного пользователя по нику. Доступен всем.",
+      info_ping_msg_desc:"Обычное сообщение без пинга.",
+      info_hl_white:"Белая",
+      info_hl_white_desc:"В канале появилось новое сообщение.",
+      info_hl_purple:"Фиолетовая",
+      info_hl_purple_desc:"Тебя упомянули через @ник.",
+      info_hl_yellow:"Жёлтая",
+      info_hl_yellow_desc:"Кто-то использовал @everyone."
     },
     en: {
       intro:"Sign in or create an account.",tab_in:"Sign in",tab_up:"Sign up",
@@ -513,7 +566,26 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       reply_to:"Reply to: ",reply_btn:"Reply",cancel_reply:"Cancel reply",
       msg_not_found:"Message not found",
       everyone_forbidden:"Only moderators and admins can use @everyone",
-      everyone_hint:"Everyone"
+      everyone_hint:"Everyone",
+      info_title:"Information",
+      info_roles_title:"Roles",
+      info_pings_title:"Pings",
+      info_highlights_title:"Channel highlights",
+      info_role_user:"User",
+      info_role_user_desc:"Posts in channels, sends photos, edits profile, replies to messages and uses @mentions.",
+      info_role_mod:"Moderator",
+      info_role_mod_desc:"Same as user + deletes messages, mutes, bans and can ping @everyone.",
+      info_role_admin:"Admin",
+      info_role_admin_desc:"Same as moderator + manages roles, deletes accounts, closes and deletes direct chats.",
+      info_ping_everyone_desc:"Mentions all members. Only moderators and admins can use.",
+      info_ping_user_desc:"Mentions a specific user by nickname. Available to everyone.",
+      info_ping_msg_desc:"Regular message without a ping.",
+      info_hl_white:"White",
+      info_hl_white_desc:"A new message appeared in the channel.",
+      info_hl_purple:"Purple",
+      info_hl_purple_desc:"Someone mentioned you via @nickname.",
+      info_hl_yellow:"Yellow",
+      info_hl_yellow_desc:"Someone used @everyone."
     }
   };
   var lang;
@@ -533,6 +605,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(typeof me !== 'undefined' && me){ try{ render(true); }catch(e){} } else { try{ setMode(mode); }catch(e){} }
     try{ applyComposer(); }catch(e){}
     try{ updateReplyPreview(); }catch(e){}
+    try{ if(!$("infoModal").hidden) renderInfo(); }catch(e){}
   }
   function updateEyeLabel(){ var show = $("eye").getAttribute("aria-pressed")==="true"; $("eye").textContent = show ? t('hide_pass') : t('show_pass'); }
   function subFor(c){ if(c.id==="announcements") return t('ch_sub_ann'); if(c.id==="scripts") return t('ch_sub_scr'); if(c.id==="general") return t('ch_sub_gen'); return t('ch_sub_med'); }
@@ -886,7 +959,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     setTimeout(function(){ n.classList.remove("highlight"); }, 1400);
   }
 
-  // Контекстное меню
   function closeCtxMenu(){ ctxMsg=null; var menu=$("ctxMenu"); menu.hidden=true; menu.innerHTML=""; }
   function openCtxMenu(x, y, m){
     if(!m || !m.id) return;
@@ -1344,7 +1416,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   };
   $("prevX").onclick=clearAttach;
 
-  // Mention dropdown
   function closeMentionDrop(){ mentionOpen=false; mentionItems=[]; mentionSel=0; $("mentionDrop").hidden=true; $("mentionDrop").innerHTML=""; }
   function renderMentionDrop(){
     var drop=$("mentionDrop"); drop.innerHTML="";
@@ -1353,12 +1424,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     mentionItems.forEach(function(it, i){
       var b=document.createElement("button"); b.type="button";
       if(i===mentionSel) b.className="sel";
-      if(it.special){
-        b.appendChild(el("span","everyone-icon","@"));
-      } else {
-        var a=el("span","ava"); paint(a, it.acc, it.name);
-        b.appendChild(a);
-      }
+      if(it.special){ b.appendChild(el("span","everyone-icon","@")); }
+      else { var a=el("span","ava"); paint(a, it.acc, it.name); b.appendChild(a); }
       b.appendChild(document.createTextNode(it.special ? "@everyone" : it.name));
       b.onmousedown=function(e){ e.preventDefault(); applyMention(it.special ? "everyone" : it.name); };
       drop.appendChild(b);
@@ -1380,15 +1447,11 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(!m){ closeMentionDrop(); return; }
     var q = (m[2]||"").toLowerCase();
     var list = [];
-    // @everyone — только для модеров/админов
-    if(canDelete() && "everyone".indexOf(q)===0){
-      list.push({key:"__everyone", name:"everyone", special:true});
-    }
+    if(canDelete() && "everyone".indexOf(q)===0){ list.push({key:"__everyone", name:"everyone", special:true}); }
     Object.keys(remoteUsers).forEach(function(k){
       var acc = remoteUsers[k]; var nm=(acc&&acc.name)||k;
       if(nm.toLowerCase().indexOf(q)===0) list.push({key:k, name:nm, acc:acc});
     });
-    // сортировка: @everyone сверху если есть
     list.sort(function(a,b){
       if(a.special && !b.special) return -1;
       if(!a.special && b.special) return 1;
@@ -1781,6 +1844,70 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   $("tabIn").addEventListener("click",function(){ setMode("in"); });
   $("tabUp").addEventListener("click",function(){ setMode("up"); });
   $("tabAd").addEventListener("click",function(){ setMode("ad"); });
+
+  // ===== INFO MODAL =====
+  function renderInfo(){
+    var box=$("icard"); box.innerHTML="";
+    box.appendChild(el("h2",null,t('info_title')));
+
+    var secRoles = el("div","info-section");
+    secRoles.appendChild(el("h3",null,t('info_roles_title')));
+    [{cls:"role-user", label:t('info_role_user'), desc:t('info_role_user_desc')},
+     {cls:"role-mod", label:t('info_role_mod'), desc:t('info_role_mod_desc')},
+     {cls:"role-admin", label:t('info_role_admin'), desc:t('info_role_admin_desc')}
+    ].forEach(function(r){
+      var row=el("div","info-row");
+      row.appendChild(el("span","role-badge "+r.cls, r.label));
+      var txt=el("div","info-text");
+      txt.appendChild(document.createTextNode(r.desc));
+      row.appendChild(txt);
+      secRoles.appendChild(row);
+    });
+    box.appendChild(secRoles);
+
+    var secPings = el("div","info-section");
+    secPings.appendChild(el("h3",null,t('info_pings_title')));
+    [{cls:"ping-everyone", label:"@everyone", desc:t('info_ping_everyone_desc')},
+     {cls:"ping-user", label:"@ник", desc:t('info_ping_user_desc')},
+     {cls:"ping-msg", label:"#", desc:t('info_ping_msg_desc')}
+    ].forEach(function(r){
+      var row=el("div","info-row");
+      row.appendChild(el("span","ping-badge "+r.cls, r.label));
+      var txt=el("div","info-text");
+      txt.appendChild(document.createTextNode(r.desc));
+      row.appendChild(txt);
+      secPings.appendChild(row);
+    });
+    box.appendChild(secPings);
+
+    var secHl = el("div","info-section");
+    secHl.appendChild(el("h3",null,t('info_highlights_title')));
+    [{cls:"white", label:t('info_hl_white'), desc:t('info_hl_white_desc')},
+     {cls:"purple", label:t('info_hl_purple'), desc:t('info_hl_purple_desc')},
+     {cls:"yellow", label:t('info_hl_yellow'), desc:t('info_hl_yellow_desc')}
+    ].forEach(function(r){
+      var row=el("div","info-row");
+      row.appendChild(el("span","ping-hl "+r.cls));
+      var txt=el("div","info-text");
+      txt.appendChild(document.createTextNode(r.label+" — "+r.desc));
+      row.appendChild(txt);
+      secHl.appendChild(row);
+    });
+    box.appendChild(secHl);
+
+    var c=el("button","btn ghost full",t('close'));
+    c.type="button"; c.style.marginTop="1rem"; c.onclick=closeInfo;
+    box.appendChild(c);
+  }
+  function openInfo(){
+    renderInfo();
+    $("infoModal").hidden=false;
+  }
+  function closeInfo(){ $("infoModal").hidden=true; }
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeInfo(); });
+  $("infoModal").addEventListener("click",function(e){ if(e.target===$("infoModal")) closeInfo(); });
+  $("infoBtnAuth").onclick=openInfo;
+  $("infoBtnSide").onclick=openInfo;
 
   function adminToggle(on){
     [".tabs","#authForm",".note","#intro"].forEach(function(s){ document.querySelector(s).hidden=on; });
