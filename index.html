@@ -329,6 +329,17 @@ button.ava:hover{background-color:var(--dim)}
     },function(){});
   }
 
+  function claimAccount(key,name,salt,h){
+    var ref=fbdb.collection("accounts").doc(key);
+    return fbdb.runTransaction(function(tx){
+      return tx.get(ref).then(function(d){
+        if(d.exists) return "taken";
+        tx.set(ref,{name:name,salt:salt,hash:h,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+        return "ok";
+      });
+    });
+  }
+
   function fbSaveUser(key, payload){
     if(!fbReady) return;
     fbdb.collection("users").doc(key).set(payload,{merge:true}).catch(function(e){console.error("saveUser:",e);});
@@ -549,9 +560,11 @@ button.ava:hover{background-color:var(--dim)}
       adminToggle(true);
       $("adCount").textContent="Загрузка…";
       $("adList").innerHTML="";
-      fbdb.collection("users").get().then(function(snap){
-        var list=[];
-        snap.forEach(function(d){ list.push({key:d.id, data:d.data()}); });
+      Promise.all([fbdb.collection("users").get(),fbdb.collection("accounts").get()]).then(function(rs){
+        var map={}, list=[];
+        rs[0].forEach(function(d){ map[d.id]={key:d.id,data:d.data()}; });
+        rs[1].forEach(function(d){ if(!map[d.id]) map[d.id]={key:d.id,data:{name:d.data().name}}; });
+        Object.keys(map).forEach(function(k){ list.push(map[k]); });
         list.sort(function(a,b){return (a.data.name||"").localeCompare(b.data.name||"")});
         var ul=$("adList"); ul.innerHTML="";
         list.forEach(function(u){
@@ -567,6 +580,7 @@ button.ava:hover{background-color:var(--dim)}
             Promise.all([
               fbdb.collection("deleted").doc(u.key).set({t:firebase.firestore.FieldValue.serverTimestamp()}),
               fbdb.collection("users").doc(u.key).delete(),
+              fbdb.collection("accounts").doc(u.key).delete(),
               fbdb.collection("presence").doc(u.key).delete()
             ]).then(showAdmin).catch(function(e){ $("adCount").textContent="Не удалось удалить: "+e.message; });
           };
@@ -613,39 +627,78 @@ button.ava:hover{background-color:var(--dim)}
     if(!/^[A-Za-zА-Яа-яЁё0-9_.-]{3,24}$/.test(name)){ err.textContent="Имя: 3–24 символа, буквы, цифры, _ . -"; return; }
     if(pw.length<6){ err.textContent="Пароль должен быть не короче 6 символов."; return; }
     var all=users(), key=name.toLowerCase();
+    if(!fbReady){
+      /* без Firebase: старая локальная схема */
+      if(mode==="up"){
+        if(pw!==$("p2").value){ err.textContent="Пароли не совпадают."; return; }
+        if(all[key]){ err.textContent="Такое имя уже занято."; return; }
+        var arr0=new Uint8Array(8); crypto.getRandomValues(arr0);
+        var salt0=Array.prototype.join.call(arr0,"-");
+        hash(pw,salt0).then(function(h){
+          all[key]={name:name,salt:salt0,hash:h,avatar:"",bio:""};
+          if(!wr(USERS,all)){ err.textContent="Не удалось сохранить аккаунт."; return; }
+          $("authForm").reset(); enter(name);
+        });
+      }else{
+        var acc0=all[key];
+        if(!acc0){ err.textContent="Аккаунт не найден. Создайте его на вкладке «Регистрация»."; return; }
+        hash(pw,acc0.salt).then(function(h){
+          if(h!==acc0.hash){ err.textContent="Неверный пароль."; return; }
+          $("authForm").reset(); enter(acc0.name);
+        });
+      }
+      return;
+    }
+    /* с Firebase: аккаунты общие для всех устройств */
+    var srvErr=function(e){ console.error("auth:",e); err.textContent="Не удалось связаться с сервером. Попробуйте позже."; };
     if(mode==="up"){
       if(pw!==$("p2").value){ err.textContent="Пароли не совпадают."; return; }
-      if(all[key]){ err.textContent="Такое имя уже занято."; return; }
       var arr=new Uint8Array(8); crypto.getRandomValues(arr);
       var salt=Array.prototype.join.call(arr,"-");
-      var taken=fbReady?fbdb.collection("users").doc(key).get().then(function(d){return d.exists;}).catch(function(){return false;}):Promise.resolve(false);
-      taken.then(function(t){ if(t){ err.textContent="Такое имя уже занято."; return; } return hash(pw,salt).then(function(h){
-        all[key]={name:name,salt:salt,hash:h,avatar:"",bio:""};
-        if(!wr(USERS,all)){ err.textContent="Не удалось сохранить аккаунт."; return; }
-        /* Дублируем в Firestore, чтобы админка и другие пользователи видели профиль */
-        fbSaveUser(key, { name: name, avatar: "", bio: "" });
-        if(fbReady) fbdb.collection("deleted").doc(key).delete().catch(function(){});
-        $("authForm").reset(); enter(name);
-      }); });
-    }else{
-      var acc=all[key];
-      if(!acc){ err.textContent="Аккаунт не найден. Создайте его на вкладке «Регистрация»."; return; }
-      hash(pw,acc.salt).then(function(h){
-        if(h!==acc.hash){ err.textContent="Неверный пароль."; return; }
-        checkDeleted(key).then(function(del){
-          if(del){ var u=users(); delete u[key]; wr(USERS,u); err.textContent="Этот аккаунт удалён администратором."; return; }
-          $("authForm").reset(); enter(acc.name);
+      hash(pw,salt).then(function(h){ return claimAccount(key,name,salt,h); }).then(function(r){
+        if(r==="taken"){ err.textContent="Такое имя уже занято."; return; }
+        fbSaveUser(key,{name:name,avatar:"",bio:""});
+        return fbdb.collection("deleted").doc(key).delete().catch(function(){}).then(function(){ $("authForm").reset(); enter(name); });
+      }).catch(srvErr);
+      return;
+    }
+    fbdb.collection("accounts").doc(key).get().then(function(d){
+      if(d.exists){
+        var ac=d.data();
+        return hash(pw,ac.salt).then(function(h){
+          if(h!==ac.hash){ err.textContent="Неверный пароль."; return; }
+          $("authForm").reset(); enter(ac.name||name);
+        });
+      }
+      /* в базе аккаунта нет: пробуем перенести старый аккаунт, созданный на этом устройстве */
+      var la=all[key];
+      if(!la){ err.textContent="Аккаунт не найден. Создайте его на вкладке «Регистрация»."; return; }
+      return Promise.all([hash(pw,la.salt),checkDeleted(key)]).then(function(r){
+        if(r[1]){ var u=users(); delete u[key]; wr(USERS,u); err.textContent="Этот аккаунт удалён администратором."; return; }
+        if(r[0]!==la.hash){ err.textContent="Неверный пароль."; return; }
+        return claimAccount(key,la.name,la.salt,la.hash).then(function(res){
+          if(res==="taken"){ err.textContent="Неверный пароль."; return; }
+          $("authForm").reset(); enter(la.name);
         });
       });
-    }
+    }).catch(srvErr);
   });
 
   try{
-    var s=localStorage.getItem(SESSION), a=s&&users()[s.toLowerCase()];
-    if(a) checkDeleted(a.name.toLowerCase()).then(function(del){
-      if(del){ var u=users(); delete u[a.name.toLowerCase()]; wr(USERS,u); try{ localStorage.removeItem(SESSION); }catch(e){} return; }
-      enter(a.name);
-    });
+    var s0=localStorage.getItem(SESSION);
+    if(s0){
+      var sk=s0.toLowerCase(), la0=users()[sk];
+      var dropSession=function(){ try{ localStorage.removeItem(SESSION); }catch(e){} };
+      if(!fbReady){ if(la0) enter(la0.name); }
+      else fbdb.collection("accounts").doc(sk).get().then(function(d){
+        if(d.exists){ enter(d.data().name||s0); return; }
+        if(!la0){ dropSession(); return; }
+        return checkDeleted(sk).then(function(del){
+          if(del){ var u=users(); delete u[sk]; wr(USERS,u); dropSession(); return; }
+          enter(la0.name);
+        });
+      }).catch(function(){ if(la0) enter(la0.name); });
+    }
   }catch(e){}
 })();
 </script>
