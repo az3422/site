@@ -49,14 +49,19 @@ button.ava:hover{background-color:var(--dim)}
 .card h1{font-weight:800;font-size:1.8rem;letter-spacing:-.03em;margin-bottom:.4rem}
 .card h2{font-weight:800;font-size:1.3rem;margin-bottom:.6rem}
 .card p{margin:0 0 1.25rem;opacity:.75}
-.card .err{min-height:1.4rem;margin:0 0 .6rem;font-weight:500;opacity:1}
+.card .err{min-height:1.4rem;margin:0 0 .6rem;font-weight:500;opacity:1;transition:color .2s ease}
 .card .note{font-size:.85rem;opacity:.7;margin:1rem 0 0}
 .tabs{display:flex;border:2px solid var(--fg);border-radius:999px;margin-bottom:1.25rem;overflow:hidden}
-.tabs button{flex:1;background:none;border:0;padding:.55rem;font-weight:500}
+.tabs button{flex:1;background:transparent;border:0;padding:.55rem;font-weight:500;transition:background .28s ease,color .28s ease,transform .15s ease}
+.tabs button:active{transform:scale(.97)}
 .tabs button[aria-selected=true]{background:var(--fg);color:var(--bg)}
-.card label{display:block;font-weight:500;margin-bottom:.9rem}
+.card label{display:block;font-weight:500;margin-bottom:.9rem;max-height:120px;opacity:1;overflow:hidden;transform:translateY(0);transition:opacity .28s cubic-bezier(.2,.7,.3,1),max-height .35s cubic-bezier(.2,.7,.3,1),margin-bottom .3s cubic-bezier(.2,.7,.3,1),transform .3s cubic-bezier(.2,.7,.3,1)}
+.card label.off{max-height:0;opacity:0;margin-bottom:0;transform:translateY(-8px);pointer-events:none}
 .card input:not([type=file]),.card textarea{display:block;width:100%;margin-top:.3rem;border:2px solid var(--fg);border-radius:.7rem;padding:.65rem .9rem;background:var(--bg);resize:vertical}
 .eye{margin-bottom:.9rem}
+#authBtn{transition:opacity .16s ease,transform .18s ease,background .2s ease,color .2s ease}
+#adminView{animation:adminIn .32s cubic-bezier(.2,.7,.3,1)}
+@keyframes adminIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .adl{margin:0 0 1.25rem;max-height:40vh;overflow-y:auto;border:2px solid var(--fg);border-radius:.7rem}
 .adl li{display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;border-bottom:1px solid var(--fg)}
 .adl li:last-child{border-bottom:0}
@@ -232,7 +237,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var ADSALT="divine-admin", ADHASH="cd0159aca7bbdb576d4beec4912e52a6bbd97f1205510b3c2a03e829b1c75208";
   var CH=[{id:"announcements",name:"announcements",sub:"Новости сервера"},{id:"general",name:"general",sub:"Общий чат"},{id:"media",name:"media",sub:"Фотографии"}];
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
-  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app");
+  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0;
 
   var firebaseConfig = {
     apiKey:            "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
@@ -743,10 +748,28 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     $("tabIn").setAttribute("aria-selected",m==="in");
     $("tabUp").setAttribute("aria-selected",m==="up");
     $("tabAd").setAttribute("aria-selected",m==="ad");
-    $("u").parentNode.hidden=m==="ad"; $("u").required=m!=="ad";
-    $("p2row").hidden=m!=="up"; $("p2").required=m==="up";
+    var uLab=$("u").parentNode;
+    if(uLab.hasAttribute("hidden")) uLab.removeAttribute("hidden");
+    uLab.classList.toggle("off", m==="ad");
+    $("u").required=m!=="ad";
+    var p2row=$("p2row");
+    if(p2row.hasAttribute("hidden")) p2row.removeAttribute("hidden");
+    p2row.classList.toggle("off", m!=="up");
+    $("p2").required=m==="up";
     $("p").autocomplete=m==="up"?"new-password":"current-password";
-    $("authBtn").textContent=m==="up"?"Создать аккаунт":m==="ad"?"Открыть":"Войти";
+    var btnText=m==="up"?"Создать аккаунт":m==="ad"?"Открыть":"Войти";
+    var btn=$("authBtn");
+    if(btn.textContent.trim()!==btnText){
+      var tk=++btnToken;
+      btn.style.opacity="0";
+      btn.style.transform="scale(.96)";
+      setTimeout(function(){
+        if(tk!==btnToken) return;
+        btn.textContent=btnText;
+        btn.style.opacity="";
+        btn.style.transform="";
+      },150);
+    }
     $("err").textContent="";
   }
   $("tabIn").addEventListener("click",function(){ setMode("in"); });
