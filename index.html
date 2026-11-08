@@ -79,6 +79,19 @@ button.ava:hover{background-color:var(--dim)}
 .st::after{content:"";position:absolute;right:-3px;bottom:-3px;width:.85rem;height:.85rem;border-radius:50%;background:#808080;border:2px solid var(--bg)}
 .st.on::after{background:#23c552}
 .memx,.membtn{display:none}
+.bdg{display:inline-block;border:2px solid var(--fg);border-radius:999px;padding:0 .45rem;font-size:.7rem;line-height:1.35;margin-left:.4rem;font-weight:500}
+.m .b{flex:1}
+.delmsg{margin-left:auto;align-self:flex-start;opacity:.5}
+.m:hover .delmsg,.delmsg:focus-visible{opacity:1}
+.mlist li{display:flex;align-items:center;gap:.3rem}
+.mlist li>button:first-child{flex:1;min-width:0}
+.mlist li .sm{width:auto;flex:none;border:2px solid var(--fg);border-radius:999px;padding:.15rem .7rem}
+.mlist li .sm:hover{background:var(--fg);color:var(--bg)}
+.mlist .nline{display:flex;align-items:center;min-width:0}
+.mlist .hd{padding:.8rem .5rem .3rem;font-size:.85rem;opacity:.7}
+.mlist .bn{flex:1;padding:.4rem .5rem}
+.adl li{flex-wrap:wrap}
+.acts{flex-basis:100%;display:flex;gap:.4rem;flex-wrap:wrap;padding-left:2.6rem}
 .side{border-right:2px solid var(--fg);display:flex;flex-direction:column;min-height:0}
 .side h1{font-weight:800;font-size:1.3rem;letter-spacing:-.02em;padding:1.1rem 1.25rem;border-bottom:2px solid var(--fg)}
 .cat{padding:.9rem 1.25rem .3rem;font-size:.85rem;font-weight:500;opacity:.7}
@@ -206,7 +219,7 @@ button.ava:hover{background-color:var(--dim)}
     appId:             "1:477692936922:web:fdd8daab2a89c588f91be3"
   };
   var fbReady=false, fbdb=null;
-  var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=90000;
+  var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=90000, roles={}, bans={}, unsubRoles=null, unsubBans=null, pendMsg=null, pendBan=null;
   var remoteUsers={};   
   try{
     if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
@@ -226,6 +239,7 @@ button.ava:hover{background-color:var(--dim)}
         snap.forEach(function(d){
           var x=d.data();
           arr.push({
+            id: d.id,
             by: x.by,
             name: x.name,
             text: x.text,
@@ -270,9 +284,12 @@ button.ava:hover{background-color:var(--dim)}
     if(me&&!src[me.key]) out.push({key:me.key,acc:getAcc(me.key)||{name:me.name}});
     return out;
   }
+  function isAdmin(key){ var r=roles[key]; return !!r&&r.role==="admin"; }
+  function amAdmin(){ return !!me&&isAdmin(me.key); }
   function renderMembers(){
     if(!me) return;
-    var ul=$("mlist"), list=memberList().map(function(m){
+    var ul=$("mlist"), adm=fbReady&&amAdmin();
+    var list=memberList().filter(function(m){ return !bans[m.key]; }).map(function(m){
       m.on=isOnline(m.key); m.name=(m.acc&&m.acc.name)||m.key; return m;
     });
     list.sort(function(a,b){ return (b.on-a.on)||a.name.localeCompare(b.name); });
@@ -281,12 +298,59 @@ button.ava:hover{background-color:var(--dim)}
     ul.innerHTML="";
     list.forEach(function(m){
       var li=el("li",m.on?"on":"off"), b=el("button"); b.type="button";
-      b.setAttribute("aria-label",m.name+", "+(m.on?"в сети":"не в сети"));
+      b.setAttribute("aria-label",m.name+(isAdmin(m.key)?", админ":"")+", "+(m.on?"в сети":"не в сети"));
       var st=el("span","st"+(m.on?" on":"")), a=el("span","ava s"); paint(a,m.acc,m.name); st.appendChild(a);
-      var t=el("span","t"); t.appendChild(el("span","nmx",m.name)); t.appendChild(el("small",null,m.on?"в сети":"не в сети"));
+      var t=el("span","t"), nl=el("span","nline"); nl.appendChild(el("span","nmx",m.name));
+      if(isAdmin(m.key)) nl.appendChild(el("span","bdg","админ"));
+      t.appendChild(nl); t.appendChild(el("small",null,m.on?"в сети":"не в сети"));
       b.appendChild(st); b.appendChild(t);
       b.onclick=function(){ app.classList.remove("showmem"); openProfile(m.key,m.name); };
-      li.appendChild(b); ul.appendChild(li);
+      li.appendChild(b);
+      if(adm&&m.key!==me.key&&!isAdmin(m.key)){
+        var bb=el("button","sm",pendBan===m.key?"Точно?":"Бан"); bb.type="button";
+        bb.setAttribute("aria-label","Забанить "+m.name);
+        bb.onclick=function(){
+          if(pendBan!==m.key){ pendBan=m.key; renderMembers(); return; }
+          pendBan=null;
+          fbdb.collection("bans").doc(m.key).set({by:me.key,t:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(e){ console.error("ban:",e); });
+        };
+        li.appendChild(bb);
+      }
+      ul.appendChild(li);
+    });
+    if(adm){
+      var bk=Object.keys(bans);
+      if(bk.length){
+        ul.appendChild(el("li","hd","Забанены — "+bk.length));
+        bk.forEach(function(k){
+          var acc=getAcc(k), li=el("li","off"), ub=el("button","sm","Разбан"); ub.type="button";
+          ub.onclick=function(){ fbdb.collection("bans").doc(k).delete().catch(function(e){ console.error("unban:",e); }); };
+          li.appendChild(el("span","bn nmx",(acc&&acc.name)||k)); li.appendChild(ub); ul.appendChild(li);
+        });
+      }
+    }
+  }
+  function watchRoles(){
+    if(unsubRoles){ unsubRoles(); unsubRoles=null; }
+    if(unsubBans){ unsubBans(); unsubBans=null; }
+    unsubRoles=fbdb.collection("roles").onSnapshot(function(snap){
+      var tmp={}; snap.forEach(function(d){ tmp[d.id]=d.data(); }); roles=tmp;
+      if(me){ renderMembers(); renderMsgs(); }
+    },function(e){ console.error("roles:",e); });
+    unsubBans=fbdb.collection("bans").onSnapshot(function(snap){
+      var tmp={}; snap.forEach(function(d){ tmp[d.id]=d.data(); }); bans=tmp;
+      if(me&&bans[me.key]){ forceOut("Вы забанены администратором."); return; }
+      if(me) renderMembers();
+    },function(e){ console.error("bans:",e); });
+  }
+  function checkBanned(key){
+    if(!fbReady) return Promise.resolve(false);
+    return fbdb.collection("bans").doc(key).get().then(function(d){return d.exists;}).catch(function(){return false;});
+  }
+  function enterChecked(name){
+    checkBanned(name.toLowerCase()).then(function(bn){
+      if(bn){ try{ localStorage.removeItem(SESSION); }catch(e){} $("err").textContent="Вы забанены администратором."; return; }
+      $("authForm").reset(); enter(name);
     });
   }
   function stopPresence(del){
@@ -391,8 +455,21 @@ button.ava:hover{background-color:var(--dim)}
       a.onclick=function(){ openProfile(m.by,name); };
       var b=el("div","b"), h=el("div","h"), n=el("button","nm",name); n.type="button";
       n.onclick=function(){ openProfile(m.by,name); };
-      h.appendChild(n); h.appendChild(el("time",null,new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
-      b.appendChild(h); b.appendChild(el("p",null,m.text)); row.appendChild(a); row.appendChild(b); box.appendChild(row);
+      h.appendChild(n);
+      if(isAdmin(m.by)) h.appendChild(el("span","bdg","админ"));
+      h.appendChild(el("time",null,new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
+      b.appendChild(h); b.appendChild(el("p",null,m.text)); row.appendChild(a); row.appendChild(b);
+      if(fbReady&&amAdmin()&&m.id){
+        var x=el("button","sm delmsg",pendMsg===m.id?"Удалить?":"×"); x.type="button";
+        x.setAttribute("aria-label","Удалить сообщение");
+        x.onclick=function(){
+          if(pendMsg!==m.id){ pendMsg=m.id; renderMsgs(); return; }
+          pendMsg=null;
+          fbdb.collection("channels").doc(cur).collection("messages").doc(m.id).delete().catch(function(e){ console.error("delmsg:",e); });
+        };
+        row.appendChild(x);
+      }
+      box.appendChild(row);
     });
     if(force||near) box.scrollTop=box.scrollHeight;
   }
@@ -402,7 +479,7 @@ button.ava:hover{background-color:var(--dim)}
     me={key:name.toLowerCase(),name:name};
     try{ localStorage.setItem(SESSION,name); }catch(e){}
     loadData();
-    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); ensureRemoteUser(); }
+    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); }
     hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
   }
   $("form").onsubmit=function(e){
@@ -427,6 +504,8 @@ button.ava:hover{background-color:var(--dim)}
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
     stopPresence(true); if(unsubDel){ unsubDel(); unsubDel=null; }
+    if(unsubRoles){ unsubRoles(); unsubRoles=null; } if(unsubBans){ unsubBans(); unsubBans=null; }
+    roles={}; bans={}; pendMsg=null; pendBan=null;
     remoteUsers={}; presence={};
     try{ localStorage.removeItem(SESSION); }catch(e){}
     me=null; closeProfile(); app.hidden=true; $("auth").hidden=false; hidePw(); setMode("in"); $("u").focus();
@@ -563,16 +642,34 @@ button.ava:hover{background-color:var(--dim)}
       adminToggle(true);
       $("adCount").textContent="Загрузка…";
       $("adList").innerHTML="";
-      Promise.all([fbdb.collection("users").get(),fbdb.collection("accounts").get()]).then(function(rs){
+      Promise.all([fbdb.collection("users").get(),fbdb.collection("accounts").get(),fbdb.collection("roles").get(),fbdb.collection("bans").get()]).then(function(rs){
         var map={}, list=[];
         rs[0].forEach(function(d){ map[d.id]={key:d.id,data:d.data()}; });
         rs[1].forEach(function(d){ if(!map[d.id]) map[d.id]={key:d.id,data:{name:d.data().name}}; });
         Object.keys(map).forEach(function(k){ list.push(map[k]); });
+        var rl={}, bn={};
+        rs[2].forEach(function(d){ rl[d.id]=d.data(); });
+        rs[3].forEach(function(d){ bn[d.id]=d.data(); });
         list.sort(function(a,b){return (a.data.name||"").localeCompare(b.data.name||"")});
         var ul=$("adList"); ul.innerHTML="";
         list.forEach(function(u){
           var li=el("li"), a=el("span","ava s"); paint(a,u.data,u.data.name);
-          var nm=u.data.name||u.key;
+          var nm=u.data.name||u.key, isA=!!rl[u.key]&&rl[u.key].role==="admin", isB=!!bn[u.key];
+          var nl=el("span","n",nm);
+          if(isA) nl.appendChild(el("span","bdg","админ"));
+          if(isB) nl.appendChild(el("span","bdg","бан"));
+          var fail=function(e){ $("adCount").textContent="Не удалось: "+e.message; };
+          var acts=el("div","acts");
+          var rb=el("button","sm",isA?"Снять админку":"Дать админку"); rb.type="button";
+          rb.onclick=function(){
+            rb.disabled=true;
+            (isA?fbdb.collection("roles").doc(u.key).delete():fbdb.collection("roles").doc(u.key).set({role:"admin",t:firebase.firestore.FieldValue.serverTimestamp()})).then(showAdmin).catch(fail);
+          };
+          var bb=el("button","sm",isB?"Разбан":"Бан"); bb.type="button";
+          bb.onclick=function(){
+            bb.disabled=true;
+            (isB?fbdb.collection("bans").doc(u.key).delete():fbdb.collection("bans").doc(u.key).set({by:"owner",t:firebase.firestore.FieldValue.serverTimestamp()})).then(showAdmin).catch(fail);
+          };
           var b=el("button","sm",pendDel===u.key?"Точно удалить?":"Удалить"); b.type="button";
           b.setAttribute("aria-label","Удалить аккаунт "+nm);
           b.onclick=function(){
@@ -584,10 +681,13 @@ button.ava:hover{background-color:var(--dim)}
               fbdb.collection("deleted").doc(u.key).set({t:firebase.firestore.FieldValue.serverTimestamp()}),
               fbdb.collection("users").doc(u.key).delete(),
               fbdb.collection("accounts").doc(u.key).delete(),
-              fbdb.collection("presence").doc(u.key).delete()
-            ]).then(showAdmin).catch(function(e){ $("adCount").textContent="Не удалось удалить: "+e.message; });
+              fbdb.collection("presence").doc(u.key).delete(),
+              fbdb.collection("roles").doc(u.key).delete(),
+              fbdb.collection("bans").doc(u.key).delete()
+            ]).then(showAdmin).catch(fail);
           };
-          li.appendChild(a); li.appendChild(el("span","n",nm)); li.appendChild(b); ul.appendChild(li);
+          acts.appendChild(rb); acts.appendChild(bb); acts.appendChild(b);
+          li.appendChild(a); li.appendChild(nl); li.appendChild(acts); ul.appendChild(li);
         });
         ul.hidden=!list.length;
         $("adCount").textContent=list.length?"Всего аккаунтов: "+list.length:"Аккаунтов пока нет.";
@@ -672,7 +772,7 @@ button.ava:hover{background-color:var(--dim)}
         var ac=d.data();
         return hash(pw,ac.salt).then(function(h){
           if(h!==ac.hash){ err.textContent="Неверный пароль."; return; }
-          $("authForm").reset(); enter(ac.name||name);
+          enterChecked(ac.name||name);
         });
       }
       /* в базе аккаунта нет: пробуем перенести старый аккаунт, созданный на этом устройстве */
@@ -683,7 +783,7 @@ button.ava:hover{background-color:var(--dim)}
         if(r[0]!==la.hash){ err.textContent="Неверный пароль."; return; }
         return claimAccount(key,la.name,la.salt,la.hash,true).then(function(res){
           if(res==="taken"){ err.textContent="Неверный пароль."; return; }
-          $("authForm").reset(); enter(la.name);
+          enterChecked(la.name);
         });
       });
     }).catch(srvErr);
@@ -696,11 +796,11 @@ button.ava:hover{background-color:var(--dim)}
       var dropSession=function(){ try{ localStorage.removeItem(SESSION); }catch(e){} };
       if(!fbReady){ if(la0) enter(la0.name); }
       else fbdb.collection("accounts").doc(sk).get().then(function(d){
-        if(d.exists){ enter(d.data().name||s0); return; }
+        if(d.exists){ enterChecked(d.data().name||s0); return; }
         if(!la0){ dropSession(); return; }
         return checkDeleted(sk).then(function(del){
           if(del){ var u=users(); delete u[sk]; wr(USERS,u); dropSession(); return; }
-          enter(la0.name);
+          enterChecked(la0.name);
         });
       }).catch(function(){ if(la0) enter(la0.name); });
     }
