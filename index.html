@@ -38,6 +38,8 @@ button.ava:hover{background-color:var(--dim)}
 .btn.full{width:100%}
 .sm{background:none;border:2px solid var(--fg);border-radius:999px;padding:.4rem 1rem;font-size:.9rem;line-height:1.2;min-height:2.3rem;white-space:nowrap;flex:none}
 .sm:hover,.sm[aria-pressed=true]{background:var(--fg);color:var(--bg)}
+.sm.danger{border-color:#ff4d4d;color:#ff4d4d}
+.sm.danger:hover{background:#ff4d4d;color:#fff;border-color:#ff4d4d}
 
 .auth,.modal{position:fixed;inset:0;z-index:5;background:var(--bg);display:grid;place-items:center;padding:1.25rem;overflow-y:auto;overflow-x:hidden}
 .auth::before{content:"";position:fixed;top:50%;left:50%;width:130vmin;height:130vmin;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.16) 0%,rgba(255,255,255,.07) 28%,transparent 62%);filter:blur(60px);pointer-events:none;animation:authHalo 5.5s ease-in-out infinite}
@@ -147,7 +149,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 #who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
 
 .chat{display:flex;flex-direction:column;min-height:0;min-width:0}
-.top{display:flex;align-items:center;gap:.8rem;padding:.9rem 1.25rem;border-bottom:2px solid var(--fg)}
+.top{display:flex;align-items:center;gap:.5rem;padding:.9rem 1.25rem;border-bottom:2px solid var(--fg);flex-wrap:wrap}
 .ttl{display:flex;align-items:baseline;gap:.8rem;min-width:0;flex:1 1 auto}
 .top b{font-family:var(--display);font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .top small{opacity:.7;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -207,9 +209,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   .app.open .side{display:none}
   .app.open .chat{display:flex}
   .back{display:grid}
-  .top{padding:.7rem 1rem;gap:.6rem}
+  .top{padding:.7rem 1rem;gap:.4rem}
   .ttl{flex-direction:column;align-items:flex-start;gap:0}
   #dmlist{max-height:35vh}
+  .top .sm{padding:.3rem .7rem;font-size:.82rem;min-height:2rem}
 }
 </style>
 </head>
@@ -256,6 +259,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       <button class="back" id="back" type="button" aria-label="Назад к списку каналов">←</button>
       <div class="ttl"><b id="topName"></b><small id="topSub"></small></div>
       <button class="sm" id="dmLockBtn" type="button" hidden>Закрыть</button>
+      <button class="sm danger" id="dmDelBtn" type="button" hidden>Удалить</button>
+      <button class="sm danger" id="clearBtn" type="button" hidden>Очистить</button>
       <button class="sm membtn" id="memBtn" type="button">Участники</button>
     </div>
     <div class="msgs" id="msgs" aria-live="polite"></div>
@@ -453,6 +458,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(unsubDM){ unsubDM(); unsubDM=null; }
     dmData=[];
     $("dmLockBtn").hidden=true;
+    $("dmDelBtn").hidden=true;
     $("memBtn").hidden=false;
     render(true);
   }
@@ -662,7 +668,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         else { b.textContent="# "+c.name; }
         b.onclick=function(){
           dmUser=null; if(unsubDM){ unsubDM(); unsubDM=null; } dmData=[];
-          $("dmLockBtn").hidden=true; $("memBtn").hidden=false;
+          $("dmLockBtn").hidden=true; $("dmDelBtn").hidden=true; $("memBtn").hidden=false;
           cur=c.id; delete unreadCh[c.id]; lastSeenCh[c.id]=Date.now();
           app.classList.add("open"); if(fbReady) subscribeMessages(cur);
           swapUntil=Date.now()+1500; render(true); $("input").focus();
@@ -697,8 +703,18 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     });
   }
   function renderMe(){ var acc=getAcc(me.key); paint($("meAva"),acc,me.name); $("who").textContent=me.name; }
+  function updateClearBtn(){
+    var show = false;
+    if(fbReady && me && !dmUser){
+      var role = roleOf(me.key);
+      if(role === "admin") show = true;
+      else if(role === "mod" && cur !== "scripts" && cur !== "announcements") show = true;
+    }
+    $("clearBtn").hidden = !show;
+  }
   function renderMsgs(force){
     if(dmUser){ renderDM(); return; }
+    updateClearBtn();
     if(cur==="scripts"){ renderForum(force); return; }
     var c=chan(), box=$("msgs"), list=data[cur]||[];
     var near=box.scrollHeight-box.scrollTop-box.clientHeight<80, stick=!!force||near;
@@ -740,6 +756,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   }
   function renderDM(){
     if(!dmUser) return;
+    $("clearBtn").hidden = true;
     var box=$("msgs"), d=dms[dmUser];
     var acc=getAcc(dmUser);
     var nm=(acc&&acc.name)||dmUser;
@@ -753,8 +770,11 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       $("dmLockBtn").onclick=function(){
         fbdb.collection("dms").doc(dmUser).update({closed: !d.closed}).catch(function(e){ console.error(e); });
       };
+      $("dmDelBtn").hidden=false;
+      $("dmDelBtn").onclick=function(){ deleteDM(dmUser); };
     } else {
       $("dmLockBtn").hidden=true;
+      $("dmDelBtn").hidden=true;
     }
     $("memBtn").hidden=true;
     applyComposer();
@@ -785,6 +805,77 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       box.appendChild(row);
     });
     box.scrollTop=box.scrollHeight;
+  }
+  function deleteDM(userKey){
+    var acc=getAcc(userKey);
+    var nm=(acc&&acc.name)||userKey;
+    if(!confirm("Удалить диалог с «"+nm+"»? У пользователя он тоже пропадёт без возможности восстановления.")) return;
+    var ref=fbdb.collection("dms").doc(userKey);
+    ref.collection("messages").get().then(function(snap){
+      var docs=[];
+      snap.forEach(function(d){ docs.push(d); });
+      if(!docs.length) return;
+      var batches=[];
+      for(var i=0; i<docs.length; i+=450){
+        var b=fbdb.batch();
+        docs.slice(i,i+450).forEach(function(d){ b.delete(d.ref); });
+        batches.push(b.commit());
+      }
+      return Promise.all(batches);
+    }).then(function(){
+      return ref.delete();
+    }).then(function(){
+      if(dmUser===userKey) closeDM();
+    }).catch(function(e){
+      console.error("delete dm:", e);
+      alert("Не удалось удалить диалог: "+e.message);
+    });
+  }
+  function clearChannel(channelId){
+    if(!confirm("Удалить ВСЕ сообщения в #"+channelId+"? Это действие нельзя отменить.")) return;
+    var serr=$("serr"); serr.textContent="Очистка…"; serr.hidden=false;
+    var ref=fbdb.collection("channels").doc(channelId).collection("messages");
+    ref.get().then(function(snap){
+      var docs=[];
+      snap.forEach(function(d){ docs.push(d); });
+      if(!docs.length){
+        serr.hidden=true; serr.textContent="";
+        return;
+      }
+      var commentJobs = docs.map(function(d){
+        return d.ref.collection("comments").get().then(function(cs){
+          var refs=[];
+          cs.forEach(function(c){ refs.push(c.ref); });
+          if(!refs.length) return;
+          var batches=[];
+          for(var i=0; i<refs.length; i+=450){
+            var b=fbdb.batch();
+            refs.slice(i,i+450).forEach(function(r){ b.delete(r); });
+            batches.push(b.commit());
+          }
+          return Promise.all(batches);
+        }).catch(function(){});
+      });
+      return Promise.all(commentJobs).then(function(){
+        var batches=[];
+        for(var i=0; i<docs.length; i+=450){
+          var b=fbdb.batch();
+          docs.slice(i,i+450).forEach(function(d){ b.delete(d.ref); });
+          batches.push(b.commit());
+        }
+        return Promise.all(batches);
+      });
+    }).then(function(){
+      data[channelId]=[];
+      loadedCh[channelId]=true;
+      serr.hidden=true; serr.textContent="";
+      renderMsgs(true);
+    }).catch(function(e){
+      console.error("clear:", e);
+      serr.textContent="Не удалось очистить: "+e.message;
+      serr.hidden=false;
+      setTimeout(function(){ serr.hidden=true; serr.textContent=""; },5000);
+    });
   }
   function openNewDM(){
     var box=$("pcard"); box.innerHTML=""; box.classList.remove("wide"); $("modal").hidden=false;
@@ -884,7 +975,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       kids[i].style.animation="msgIn .38s cubic-bezier(.2,.7,.3,1) "+(d*35)+"ms backwards";
     }
   }
-  function render(force){ renderList(); renderMe(); renderMembers(); renderMsgs(force); }
+  function render(force){ renderList(); renderMe(); renderMembers(); renderMsgs(force); updateClearBtn(); }
 
   function enter(name){
     me={key:name.toLowerCase(),name:name};
@@ -1014,6 +1105,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   };
   $("memBtn").onclick=function(){ app.classList.add("showmem"); };
   $("memX").onclick=function(){ app.classList.remove("showmem"); };
+  $("clearBtn").onclick=function(){
+    if(dmUser) return;
+    clearChannel(cur);
+  };
   $("out").onclick=function(){
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
@@ -1024,6 +1119,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(postCommentsSub){ try{ postCommentsSub(); }catch(e){} postCommentsSub=null; }
     roles={}; bans={}; mutes={}; pendMsg=null; pendBan=null;
     remoteUsers={}; presence={}; dms={}; dmUser=null; dmData=[];
+    $("dmLockBtn").hidden=true; $("dmDelBtn").hidden=true; $("clearBtn").hidden=true;
     try{ localStorage.removeItem(SESSION); }catch(e){}
     me=null; closeProfile(); app.hidden=true; $("auth").hidden=false; hidePw(); setMode("in"); $("u").focus();
   };
