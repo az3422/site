@@ -65,7 +65,20 @@ button.ava:hover{background-color:var(--dim)}
 .row{display:flex;gap:.6rem;margin-top:.5rem}
 .row .btn{flex:1}
 
-.app{display:grid;grid-template-columns:300px 1fr;height:100%;border:2px solid var(--fg)}
+.app{display:grid;grid-template-columns:300px 1fr 240px;height:100%;border:2px solid var(--fg)}
+.mem{border-left:2px solid var(--fg);display:flex;flex-direction:column;min-height:0}
+.mem h2{font-family:var(--text);font-weight:500;font-size:.95rem;padding:1.1rem 1.1rem .5rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.mlist{flex:1;overflow-y:auto;padding:0 .6rem .8rem}
+.mlist button{display:flex;align-items:center;gap:.7rem;width:100%;text-align:left;background:none;border:0;border-radius:.6rem;padding:.4rem .5rem}
+.mlist button:hover{background:var(--dim)}
+.mlist .t{display:flex;flex-direction:column;min-width:0}
+.mlist .nmx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mlist small{font-size:.78rem;opacity:.7}
+.mlist li.off .nmx{opacity:.6}
+.st{position:relative;flex:none;display:block}
+.st::after{content:"";position:absolute;right:-3px;bottom:-3px;width:.85rem;height:.85rem;border-radius:50%;background:#808080;border:2px solid var(--bg)}
+.st.on::after{background:#23c552}
+.memx,.membtn{display:none}
 .side{border-right:2px solid var(--fg);display:flex;flex-direction:column;min-height:0}
 .side h1{font-weight:800;font-size:1.3rem;letter-spacing:-.02em;padding:1.1rem 1.25rem;border-bottom:2px solid var(--fg)}
 .cat{padding:.9rem 1.25rem .3rem;font-size:.85rem;font-weight:500;opacity:.7}
@@ -95,6 +108,13 @@ button.ava:hover{background-color:var(--dim)}
 .sendbar{display:flex;gap:.6rem;padding:.8rem 1.25rem;border-top:2px solid var(--fg)}
 #input{flex:1;min-width:0;background:var(--bg);border:2px solid var(--fg);border-radius:999px;padding:.65rem 1.1rem}
 
+@media (max-width:1000px){
+  .app{grid-template-columns:300px 1fr}
+  .mem{display:none}
+  .app.showmem .mem{display:flex;position:fixed;inset:0;z-index:6;background:var(--bg);border-left:0}
+  .memx{display:inline-block}
+  .membtn{display:inline-block;margin-left:auto}
+}
 @media (max-width:720px){
   .app{grid-template-columns:1fr;border:0}
   .side{border-right:0}
@@ -147,6 +167,7 @@ button.ava:hover{background-color:var(--dim)}
     <div class="top">
       <button class="back" id="back" type="button" aria-label="Назад к списку каналов">←</button>
       <b id="topName"></b><small id="topSub"></small>
+      <button class="sm membtn" id="memBtn" type="button">Участники</button>
     </div>
     <div class="msgs" id="msgs" aria-live="polite"></div>
     <form class="sendbar" id="form" autocomplete="off">
@@ -154,6 +175,10 @@ button.ava:hover{background-color:var(--dim)}
       <button class="btn" type="submit">Отправить</button>
     </form>
   </section>
+  <aside class="mem" aria-label="Участники">
+    <h2><span id="memTitle">Участники</span><button class="sm memx" id="memX" type="button">Закрыть</button></h2>
+    <ul class="mlist" id="mlist"></ul>
+  </aside>
 </div>
 
 <div class="modal" id="modal" hidden><div class="card" id="pcard"></div></div>
@@ -181,7 +206,7 @@ button.ava:hover{background-color:var(--dim)}
     appId:             "1:477692936922:web:fdd8daab2a89c588f91be3"
   };
   var fbReady=false, fbdb=null;
-  var unsubMsgs=null, unsubUsers=null;
+  var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=90000;
   var remoteUsers={};   
   try{
     if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
@@ -221,7 +246,7 @@ button.ava:hover{background-color:var(--dim)}
       var tmp={};
       snap.forEach(function(d){ tmp[d.id]=d.data(); });
       remoteUsers=tmp;
-      if(me) renderMe();
+      if(me){ renderMe(); renderMembers(); }
       renderMsgs();
     }).catch(function(e){ console.error("users.get:",e); });
     /* И параллельно подписка на обновления */
@@ -229,9 +254,79 @@ button.ava:hover{background-color:var(--dim)}
       var tmp={};
       snap.forEach(function(d){ tmp[d.id]=d.data(); });
       remoteUsers=tmp;
-      if(me) renderMe();
+      if(me){ renderMe(); renderMembers(); }
       renderMsgs();
     }, function(e){ console.error("users:",e); });
+  }
+
+  /* ===== Онлайн-статус, список участников, удалённые аккаунты ===== */
+  function isOnline(key){
+    if(me&&key===me.key) return true;
+    var t=presence[key]; return !!t&&Date.now()-t<PRES_TTL;
+  }
+  function memberList(){
+    var src=fbReady?remoteUsers:users(), out=[];
+    Object.keys(src).forEach(function(k){ out.push({key:k,acc:src[k]}); });
+    if(me&&!src[me.key]) out.push({key:me.key,acc:getAcc(me.key)||{name:me.name}});
+    return out;
+  }
+  function renderMembers(){
+    if(!me) return;
+    var ul=$("mlist"), list=memberList().map(function(m){
+      m.on=isOnline(m.key); m.name=(m.acc&&m.acc.name)||m.key; return m;
+    });
+    list.sort(function(a,b){ return (b.on-a.on)||a.name.localeCompare(b.name); });
+    var n=list.filter(function(m){return m.on}).length;
+    $("memTitle").textContent="В сети: "+n+" из "+list.length;
+    ul.innerHTML="";
+    list.forEach(function(m){
+      var li=el("li",m.on?"on":"off"), b=el("button"); b.type="button";
+      b.setAttribute("aria-label",m.name+", "+(m.on?"в сети":"не в сети"));
+      var st=el("span","st"+(m.on?" on":"")), a=el("span","ava s"); paint(a,m.acc,m.name); st.appendChild(a);
+      var t=el("span","t"); t.appendChild(el("span","nmx",m.name)); t.appendChild(el("small",null,m.on?"в сети":"не в сети"));
+      b.appendChild(st); b.appendChild(t);
+      b.onclick=function(){ app.classList.remove("showmem"); openProfile(m.key,m.name); };
+      li.appendChild(b); ul.appendChild(li);
+    });
+  }
+  function stopPresence(del){
+    if(hbTimer){ clearInterval(hbTimer); hbTimer=null; }
+    if(tickTimer){ clearInterval(tickTimer); tickTimer=null; }
+    if(unsubPres){ unsubPres(); unsubPres=null; }
+    if(del&&fbReady&&me) fbdb.collection("presence").doc(me.key).delete().catch(function(){});
+  }
+  function startPresence(){
+    if(!fbReady||!me) return;
+    stopPresence(false);
+    var beat=function(){
+      if(!me) return;
+      fbdb.collection("presence").doc(me.key).set({name:me.name,t:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});
+    };
+    beat(); hbTimer=setInterval(beat,25000);
+    unsubPres=fbdb.collection("presence").onSnapshot(function(snap){
+      var tmp={};
+      snap.forEach(function(d){ var t=d.data().t; tmp[d.id]=(t&&t.toMillis)?t.toMillis():Date.now(); });
+      presence=tmp; renderMembers();
+    },function(e){ console.error("presence:",e); });
+    tickTimer=setInterval(renderMembers,15000);
+  }
+  window.addEventListener("pagehide",function(){ stopPresence(true); });
+  function checkDeleted(key){
+    if(!fbReady) return Promise.resolve(false);
+    return fbdb.collection("deleted").doc(key).get().then(function(d){return d.exists;}).catch(function(){return false;});
+  }
+  function ensureRemoteUser(){
+    var a=users()[me.key]; if(!fbReady||!a) return;
+    fbdb.collection("users").doc(me.key).get().then(function(d){
+      if(!d.exists) fbSaveUser(me.key,{name:a.name,avatar:a.avatar||"",bio:a.bio||""});
+    }).catch(function(){});
+  }
+  function forceOut(msg){ $("out").onclick(); $("err").textContent=msg; }
+  function watchDeleted(){
+    if(unsubDel){ unsubDel(); unsubDel=null; }
+    unsubDel=fbdb.collection("deleted").doc(me.key).onSnapshot(function(d){
+      if(d.exists&&me){ var u=users(); delete u[me.key]; wr(USERS,u); forceOut("Ваш аккаунт удалён администратором."); }
+    },function(){});
   }
 
   function fbSaveUser(key, payload){
@@ -287,14 +382,14 @@ button.ava:hover{background-color:var(--dim)}
     });
     if(force||near) box.scrollTop=box.scrollHeight;
   }
-  function render(force){ renderList(); renderMe(); renderMsgs(force); }
+  function render(force){ renderList(); renderMe(); renderMembers(); renderMsgs(force); }
 
   function enter(name){
     me={key:name.toLowerCase(),name:name};
     try{ localStorage.setItem(SESSION,name); }catch(e){}
     loadData();
-    if(fbReady){ subscribeUsers(); subscribeMessages(cur); }
-    hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open"); render(true);
+    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); ensureRemoteUser(); }
+    hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
   }
   $("form").onsubmit=function(e){
     e.preventDefault();
@@ -312,10 +407,13 @@ button.ava:hover{background-color:var(--dim)}
     wr(SRV,data); $("input").value=""; renderMsgs(true);
   };
   $("back").onclick=function(){ app.classList.remove("open"); };
+  $("memBtn").onclick=function(){ app.classList.add("showmem"); };
+  $("memX").onclick=function(){ app.classList.remove("showmem"); };
   $("out").onclick=function(){
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
-    remoteUsers={};
+    stopPresence(true); if(unsubDel){ unsubDel(); unsubDel=null; }
+    remoteUsers={}; presence={};
     try{ localStorage.removeItem(SESSION); }catch(e){}
     me=null; closeProfile(); app.hidden=true; $("auth").hidden=false; hidePw(); setMode("in"); $("u").focus();
   };
@@ -458,7 +556,21 @@ button.ava:hover{background-color:var(--dim)}
         var ul=$("adList"); ul.innerHTML="";
         list.forEach(function(u){
           var li=el("li"), a=el("span","ava s"); paint(a,u.data,u.data.name);
-          li.appendChild(a); li.appendChild(el("span","n",u.data.name)); ul.appendChild(li);
+          var nm=u.data.name||u.key;
+          var b=el("button","sm",pendDel===u.key?"Точно удалить?":"Удалить"); b.type="button";
+          b.setAttribute("aria-label","Удалить аккаунт "+nm);
+          b.onclick=function(){
+            if(pendDel!==u.key){ pendDel=u.key; showAdmin(); return; }
+            pendDel=null; b.disabled=true;
+            var lu=users(); delete lu[u.key]; wr(USERS,lu);
+            try{ if((localStorage.getItem(SESSION)||"").toLowerCase()===u.key) localStorage.removeItem(SESSION); }catch(e){}
+            Promise.all([
+              fbdb.collection("deleted").doc(u.key).set({t:firebase.firestore.FieldValue.serverTimestamp()}),
+              fbdb.collection("users").doc(u.key).delete(),
+              fbdb.collection("presence").doc(u.key).delete()
+            ]).then(showAdmin).catch(function(e){ $("adCount").textContent="Не удалось удалить: "+e.message; });
+          };
+          li.appendChild(a); li.appendChild(el("span","n",nm)); li.appendChild(b); ul.appendChild(li);
         });
         ul.hidden=!list.length;
         $("adCount").textContent=list.length?"Всего аккаунтов: "+list.length:"Аккаунтов пока нет.";
@@ -506,26 +618,34 @@ button.ava:hover{background-color:var(--dim)}
       if(all[key]){ err.textContent="Такое имя уже занято."; return; }
       var arr=new Uint8Array(8); crypto.getRandomValues(arr);
       var salt=Array.prototype.join.call(arr,"-");
-      hash(pw,salt).then(function(h){
+      var taken=fbReady?fbdb.collection("users").doc(key).get().then(function(d){return d.exists;}).catch(function(){return false;}):Promise.resolve(false);
+      taken.then(function(t){ if(t){ err.textContent="Такое имя уже занято."; return; } return hash(pw,salt).then(function(h){
         all[key]={name:name,salt:salt,hash:h,avatar:"",bio:""};
         if(!wr(USERS,all)){ err.textContent="Не удалось сохранить аккаунт."; return; }
         /* Дублируем в Firestore, чтобы админка и другие пользователи видели профиль */
         fbSaveUser(key, { name: name, avatar: "", bio: "" });
+        if(fbReady) fbdb.collection("deleted").doc(key).delete().catch(function(){});
         $("authForm").reset(); enter(name);
-      });
+      }); });
     }else{
       var acc=all[key];
       if(!acc){ err.textContent="Аккаунт не найден. Создайте его на вкладке «Регистрация»."; return; }
       hash(pw,acc.salt).then(function(h){
         if(h!==acc.hash){ err.textContent="Неверный пароль."; return; }
-        $("authForm").reset(); enter(acc.name);
+        checkDeleted(key).then(function(del){
+          if(del){ var u=users(); delete u[key]; wr(USERS,u); err.textContent="Этот аккаунт удалён администратором."; return; }
+          $("authForm").reset(); enter(acc.name);
+        });
       });
     }
   });
 
   try{
     var s=localStorage.getItem(SESSION), a=s&&users()[s.toLowerCase()];
-    if(a) enter(a.name);
+    if(a) checkDeleted(a.name.toLowerCase()).then(function(del){
+      if(del){ var u=users(); delete u[a.name.toLowerCase()]; wr(USERS,u); try{ localStorage.removeItem(SESSION); }catch(e){} return; }
+      enter(a.name);
+    });
   }catch(e){}
 })();
 </script>
