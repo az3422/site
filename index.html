@@ -35,7 +35,7 @@ button.ava:hover{background-color:var(--dim)}
 .btn.ghost{background:none;color:var(--fg)}
 .btn.ghost:hover{background:var(--fg);color:var(--bg)}
 .btn.full{width:100%}
-.sm{background:none;border:2px solid var(--fg);border-radius:999px;padding:.15rem .8rem;font-size:.85rem}
+.sm{background:none;border:2px solid var(--fg);border-radius:999px;padding:.4rem 1rem;font-size:.9rem;line-height:1.2;min-height:2.3rem;white-space:nowrap;flex:none}
 .sm:hover,.sm[aria-pressed=true]{background:var(--fg);color:var(--bg)}
 
 .auth,.modal{position:fixed;inset:0;z-index:5;background:var(--bg);display:grid;place-items:center;padding:1.25rem;overflow-y:auto}
@@ -83,12 +83,10 @@ button.ava:hover{background-color:var(--dim)}
 .adm .bdg{color:var(--fg)}
 .bdg{display:inline-block;border:2px solid var(--fg);border-radius:999px;padding:0 .45rem;font-size:.7rem;line-height:1.35;margin-left:.4rem;font-weight:500}
 .m .b{flex:1}
-.delmsg{margin-left:auto;align-self:flex-start;opacity:.5}
+.delmsg{margin-left:auto;align-self:flex-start;opacity:.5;min-width:2.3rem;padding:.3rem .6rem}
 .m:hover .delmsg,.delmsg:focus-visible{opacity:1}
 .mlist li{display:flex;align-items:center;gap:.3rem}
 .mlist li>button:first-child{flex:1;min-width:0}
-.mlist li .sm{width:auto;flex:none;border:2px solid var(--fg);border-radius:999px;padding:.15rem .7rem}
-.mlist li .sm:hover{background:var(--fg);color:var(--bg)}
 .mlist .nline{display:flex;align-items:center;min-width:0}
 .mlist .hd{padding:.8rem .5rem .3rem;font-size:.85rem;opacity:.7}
 .mlist .bn{flex:1;padding:.4rem .5rem}
@@ -107,7 +105,9 @@ button.ava:hover{background-color:var(--dim)}
 .apanel h3{font-family:var(--display);font-weight:500;font-size:1rem;margin:0 0 .6rem}
 .apanel .st2{margin:0 0 .5rem;opacity:1;font-weight:500}
 .row2{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.5rem}
-select{font:inherit;color:inherit;background:var(--bg);border:2px solid var(--fg);border-radius:999px;padding:.25rem .7rem}
+select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg);border:2px solid var(--fg);border-radius:999px;padding:.35rem .9rem;min-height:2.3rem;line-height:1.2}
+.apanel input[type=number]{width:5.5rem}
+.apanel input,.apanel select,.apanel button{flex:none}
 .side{border-right:2px solid var(--fg);display:flex;flex-direction:column;min-height:0}
 .side h1{font-weight:800;font-size:1.3rem;letter-spacing:-.02em;padding:1.1rem 1.25rem;border-bottom:2px solid var(--fg)}
 .cat{padding:.9rem 1.25rem .3rem;font-size:.85rem;font-weight:500;opacity:.7}
@@ -328,16 +328,6 @@ select{font:inherit;color:inherit;background:var(--bg);border:2px solid var(--fg
       b.appendChild(st); b.appendChild(t);
       b.onclick=function(){ app.classList.remove("showmem"); openProfile(m.key,m.name); };
       li.appendChild(b);
-      if(adm&&m.key!==me.key&&!isAdmin(m.key)){
-        var bb=el("button","sm",pendBan===m.key?"Точно?":"Бан"); bb.type="button";
-        bb.setAttribute("aria-label","Забанить "+m.name);
-        bb.onclick=function(){
-          if(pendBan!==m.key){ pendBan=m.key; renderMembers(); return; }
-          pendBan=null;
-          fbdb.collection("bans").doc(m.key).set({by:me.key,t:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(e){ console.error("ban:",e); });
-        };
-        li.appendChild(bb);
-      }
       return li;
     }
     var ga=list.filter(function(m){return m.on&&isAdmin(m.key)});
@@ -353,9 +343,13 @@ select{font:inherit;color:inherit;background:var(--bg);border:2px solid var(--fg
       if(bk.length){
         ul.appendChild(el("li","hd","Забанены — "+bk.length));
         bk.forEach(function(k){
-          var acc=getAcc(k), li=el("li","off"), ub=el("button","sm","Разбан"); ub.type="button";
-          ub.onclick=function(){ fbdb.collection("bans").doc(k).delete().catch(function(e){ console.error("unban:",e); }); };
-          li.appendChild(el("span","bn nmx",(acc&&acc.name)||k)); li.appendChild(ub); ul.appendChild(li);
+          var acc=getAcc(k), nm=(acc&&acc.name)||k, li=el("li","off"), b=el("button"); b.type="button";
+          b.setAttribute("aria-label","Профиль забаненного: "+nm);
+          var a=el("span","ava s"); paint(a,acc,nm);
+          var t=el("span","t"); t.appendChild(el("span","nmx",nm)); t.appendChild(el("small",null,"забанен"));
+          b.appendChild(a); b.appendChild(t);
+          b.onclick=function(){ app.classList.remove("showmem"); openProfile(k,nm); };
+          li.appendChild(b); ul.appendChild(li);
         });
       }
     }
@@ -652,14 +646,18 @@ select{font:inherit;color:inherit;background:var(--bg);border:2px solid var(--fg
       um.onclick=function(){ fbdb.collection("mutes").doc(key).delete().then(reopen).catch(fail); };
       r1.appendChild(um);
     }else{
-      var sel=el("select"); sel.setAttribute("aria-label","Срок мута");
-      [["10 минут",10],["1 час",60],["1 день",1440],["Навсегда",0]].forEach(function(o){ var op=el("option",null,o[0]); op.value=String(o[1]); sel.appendChild(op); });
+      var num=el("input"); num.type="number"; num.min="1"; num.max="9999"; num.value="10"; num.setAttribute("aria-label","Сколько замьютить");
+      var unit=el("select"); unit.setAttribute("aria-label","Единица времени");
+      [["минут",1],["часов",60],["дней",1440],["навсегда",0]].forEach(function(o){ var op=el("option",null,o[0]); op.value=String(o[1]); unit.appendChild(op); });
+      unit.onchange=function(){ num.disabled=unit.value==="0"; };
       var mb=el("button","sm","Замьютить"); mb.type="button";
       mb.onclick=function(){
-        var mins=parseInt(sel.value,10);
-        fbdb.collection("mutes").doc(key).set({by:me.key,until:mins?Date.now()+mins*60000:0,t:ts()}).then(reopen).catch(fail);
+        var u=parseInt(unit.value,10), n=Math.floor(Number(num.value));
+        if(u&&!(n>=1)){ num.focus(); return; }
+        n=Math.min(n,9999);
+        fbdb.collection("mutes").doc(key).set({by:me.key,until:u?Date.now()+n*u*60000:0,t:ts()}).then(reopen).catch(fail);
       };
-      r1.appendChild(sel); r1.appendChild(mb);
+      r1.appendChild(num); r1.appendChild(unit); r1.appendChild(mb);
     }
     p.appendChild(r1);
     var r2=el("div","row2"), sure=false, bb=el("button","sm",bn?"Разбанить":"Забанить"); bb.type="button";
