@@ -437,11 +437,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   }
 
   function claimAccount(key,name,salt,h,ownsProfile){
-    var ref=fbdb.collection("accounts").doc(key), uref=fbdb.collection("users").doc(key);
+    var ref=fbdb.collection("accounts").doc(key);
     return fbdb.runTransaction(function(tx){
-      return Promise.all([tx.get(ref),tx.get(uref)]).then(function(r){
-        if(r[0].exists) return "taken";
-        if(r[1].exists&&!ownsProfile) return "taken";
+      return tx.get(ref).then(function(r){
+        if(r.exists) return "taken";
         tx.set(ref,{name:name,salt:salt,hash:h,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
         return "ok";
       });
@@ -965,7 +964,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       var salt=Array.prototype.join.call(arr,"-");
       hash(pw,salt).then(function(h){ return claimAccount(key,name,salt,h); }).then(function(r){
         if(r==="taken"){ err.textContent=TAKEN; return; }
-        fbSaveUser(key,{name:name,avatar:"",bio:""});
+        fbSaveUser(key,{name:name});
         return fbdb.collection("deleted").doc(key).delete().catch(function(){}).then(function(){ $("authForm").reset(); enter(name); });
       }).catch(srvErr);
       return;
@@ -985,6 +984,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         if(r[0]!==la.hash){ err.textContent="Неверный пароль."; return; }
         return claimAccount(key,la.name,la.salt,la.hash,true).then(function(res){
           if(res==="taken"){ err.textContent="Неверный пароль."; return; }
+          fbSaveUser(key,{name:la.name});
           enterChecked(la.name);
         });
       });
@@ -1002,7 +1002,11 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         if(!la0){ dropSession(); return; }
         return checkDeleted(sk).then(function(del){
           if(del){ var u=users(); delete u[sk]; wr(USERS,u); dropSession(); return; }
-          enterChecked(la0.name);
+          return claimAccount(sk,la0.name,la0.salt,la0.hash,true).then(function(res){
+            if(res==="taken"){ dropSession(); return; }
+            fbSaveUser(sk,{name:la0.name});
+            enterChecked(la0.name);
+          });
         });
       }).catch(function(){ if(la0) enter(la0.name); });
     }
