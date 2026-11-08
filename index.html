@@ -315,12 +315,31 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     }
   }catch(e){ console.error("Firebase:",e); fbReady=false; }
 
+  function waitAuth(){
+    return new Promise(function(resolve){
+      if(!fbReady){ resolve(); return; }
+      try{
+        if(firebase.auth().currentUser){ resolve(); return; }
+        var done=false;
+        var unsub=firebase.auth().onAuthStateChanged(function(u){
+          if(done) return;
+          if(u){ done=true; try{ unsub(); }catch(e){} resolve(); }
+        });
+        setTimeout(function(){ if(!done){ done=true; try{ unsub(); }catch(e){} resolve(); } },3000);
+      }catch(e){ resolve(); }
+    });
+  }
+
   function fbAuth(name){
-    if(!fbReady||!name) return;
-    var u=null;
-    try{ u=firebase.auth().currentUser; }catch(e){}
-    if(!u){ setTimeout(function(){ fbAuth(name); },400); return; }
-    fbdb.collection("authmap").doc(u.uid).set({name:name}).catch(function(e){ console.error("authmap:",e); });
+    if(!fbReady||!name) return Promise.resolve();
+    return new Promise(function(resolve){
+      var u=null;
+      try{ u=firebase.auth().currentUser; }catch(e){}
+      if(!u){ waitAuth().then(function(){ fbAuth(name).then(resolve); }); return; }
+      fbdb.collection("authmap").doc(u.uid).set({name:name.toLowerCase()})
+        .then(function(){ resolve(); })
+        .catch(function(e){ console.error("authmap:",e); resolve(); });
+    });
   }
 
   function subscribeMessages(channelId){
@@ -661,13 +680,12 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         ib.appendChild(im); card.appendChild(ib);
       }
       var ft=el("div","postft");
-      var cnt=m.commentsCount||0;
       var cbtn;
       if(m.commentsEnabled===false){
         cbtn=el("button","cmtbtn off","Комментарии отключены"); cbtn.type="button";
         cbtn.onclick=function(){ openPost(m.id); };
       } else {
-        cbtn=el("button","cmtbtn","💬 Комментарии"+(cnt>0?" ("+cnt+")":"")); cbtn.type="button";
+        cbtn=el("button","cmtbtn","💬 Комментарии"); cbtn.type="button";
         cbtn.onclick=function(){ openPost(m.id); };
       }
       ft.appendChild(cbtn);
@@ -704,8 +722,12 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     me={key:name.toLowerCase(),name:name};
     try{ localStorage.setItem(SESSION,name); }catch(e){}
     loadData();
-    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels(); fbAuth(name); }
     hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
+    if(fbReady){
+      waitAuth().then(function(){ return fbAuth(name); }).then(function(){
+        subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels();
+      });
+    }
   }
   function muteIcon(key){
     var m=muteOf(key), s=el("span","mi"), label="В муте"+(m?" "+muteLabel(m):"");
@@ -906,12 +928,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         var txt=ci.value.trim(); if(!txt || !me) return;
         ci.value="";
         var comment={by:me.key, name:me.name, text:txt.slice(0,1000), createdAt:firebase.firestore.FieldValue.serverTimestamp()};
-        var batch=fbdb.batch();
         var cref=fbdb.collection("channels").doc("scripts").collection("messages").doc(postId).collection("comments").doc();
-        var pref=fbdb.collection("channels").doc("scripts").collection("messages").doc(postId);
-        batch.set(cref, comment);
-        batch.update(pref, {commentsCount: firebase.firestore.FieldValue.increment(1)});
-        batch.commit().catch(function(e){ console.error("comment add:",e); });
+        cref.set(comment).catch(function(e){ console.error("comment add:",e); });
       };
       box.appendChild(cf);
     }
@@ -1270,7 +1288,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       hash(pw,salt).then(function(h){ return claimAccount(key,name,salt,h); }).then(function(r){
         if(r==="taken"){ err.textContent=TAKEN; return; }
         fbSaveUser(key,{name:name,avatar:"",bio:""});
-        return fbdb.collection("deleted").doc(key).delete().catch(function(){}).then(function(){ $("authForm").reset(); enter(name); });
+        $("authForm").reset(); enter(name);
       }).catch(srvErr);
       return;
     }
