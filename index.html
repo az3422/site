@@ -144,6 +144,15 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .m time{font-size:.78rem;opacity:.6}
 .m p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
 .empty{margin:2rem auto;text-align:center;opacity:.7}
+.fcard{border:2px solid var(--fg);border-radius:1rem;padding:.9rem 1rem;margin:0 0 .8rem;display:flex;flex-direction:column;gap:.5rem;transition:background .15s,transform .15s}
+.fcard:hover{background:var(--dim)}
+.fcard .fh{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.fcard time{font-size:.78rem;opacity:.6}
+.fcard .fp{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.fcard .pic{max-width:min(100%,400px);max-height:300px;border:0;margin-top:.2rem;border-radius:.6rem}
+.fcard .actions{display:flex;justify-content:flex-end;margin-top:.3rem}
+.fcard .delmsg{opacity:.5;margin:0;align-self:auto}
+.fcard:hover .delmsg,.fcard .delmsg:focus-visible{opacity:1}
 .sendbar{display:flex;gap:.6rem;padding:.8rem 1.25rem;border-top:2px solid var(--fg)}
 #input{flex:1;min-width:0;background:var(--bg);border:2px solid var(--fg);border-radius:999px;padding:.65rem 1.1rem}
 
@@ -235,9 +244,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var $=function(id){return document.getElementById(id)};
   var USERS="divine-net-users-v1", SESSION="divine-net-session-v1", SRV="divine-net-server-v1";
   var ADSALT="divine-admin", ADHASH="cd0159aca7bbdb576d4beec4912e52a6bbd97f1205510b3c2a03e829b1c75208";
-  var CH=[{id:"announcements",name:"announcements",sub:"Новости сервера"},{id:"scripts",name:"scripts",sub:"Скрипты"},{id:"general",name:"general",sub:"Общий чат"},{id:"media",name:"media",sub:"Фотографии"}];
+  var CH=[{id:"announcements",name:"announcements",sub:"Новости сервера"},{id:"scripts",name:"scripts",sub:"Форум скриптов"},{id:"general",name:"general",sub:"Общий чат"},{id:"media",name:"media",sub:"Фотографии"}];
   var READONLY={"announcements":1,"scripts":1};
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
+  var FORUM_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:middle;margin-right:.4rem" aria-hidden="true"><path d="M3 4h18v2H3V4zm0 5h18v2H3V9zm0 5h18v2H3v-2z"/></svg>';
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0;
 
   var firebaseConfig = {
@@ -467,13 +477,19 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function renderList(){
     var ul=$("list"); ul.innerHTML="";
     CH.forEach(function(c){
-      var li=el("li",c.id===cur?"on":""), b=el("button",null,"# "+c.name); b.type="button";
+      var li=el("li",c.id===cur?"on":""), b=el("button"); b.type="button";
+      if(c.id==="scripts"){
+        b.innerHTML=FORUM_SVG+c.name;
+      } else {
+        b.textContent="# "+c.name;
+      }
       b.onclick=function(){ cur=c.id; app.classList.add("open"); if(fbReady) subscribeMessages(cur); render(true); $("input").focus(); };
       li.appendChild(b); ul.appendChild(li);
     });
   }
   function renderMe(){ var acc=getAcc(me.key); paint($("meAva"),acc,me.name); $("who").textContent=me.name; }
   function renderMsgs(force){
+    if(cur==="scripts"){ renderForum(force); return; }
     var c=chan(), box=$("msgs"), list=data[cur]||[];
     var near=box.scrollHeight-box.scrollTop-box.clientHeight<80, stick=!!force||near;
     $("topName").textContent="# "+c.name; $("topSub").textContent=c.sub; $("input").placeholder="Написать в #"+c.name; applyComposer();
@@ -509,6 +525,52 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     });
     if(force||near) box.scrollTop=box.scrollHeight;
   }
+  function renderForum(force){
+    var c=chan(), box=$("msgs"), list=data[cur]||[];
+    $("topName").innerHTML=FORUM_SVG+"scripts";
+    $("topSub").textContent=c.sub;
+    $("input").placeholder="Написать в scripts";
+    applyComposer();
+    box.innerHTML="";
+    if(!list.length){
+      box.appendChild(el("p","empty",canWrite()?"Здесь пока нет постов. Создайте первый.":"Здесь пока нет постов."));
+      return;
+    }
+    var posts=list.slice().reverse();
+    posts.forEach(function(m){
+      var acc=getAcc(m.by), name=acc?acc.name:m.name;
+      var card=el("div","fcard");
+      var head=el("div","fh");
+      var a=el("button","ava"); a.type="button"; paint(a,acc,name); a.setAttribute("aria-label","Профиль: "+name);
+      a.onclick=function(){ openProfile(m.by,name); };
+      var n=el("button","nm",name); n.type="button";
+      n.onclick=function(){ openProfile(m.by,name); };
+      if(isAdmin(m.by)){ n.classList.add("adm"); n.setAttribute("aria-label",name+", админ"); }
+      head.appendChild(a); head.appendChild(n);
+      head.appendChild(el("time",null,new Date(m.t).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})));
+      card.appendChild(head);
+      if(m.text){ card.appendChild(el("p","fp",m.text)); }
+      if(okImg(m.image)){
+        var ib=el("button","picb"), im=el("img","pic"); ib.type="button"; ib.setAttribute("aria-label","Открыть фото");
+        im.src=m.image; im.alt="Фото от "+name;
+        ib.onclick=function(){ openImage(m.image); };
+        ib.appendChild(im); card.appendChild(ib);
+      }
+      if(fbReady&&amAdmin()&&m.id){
+        var acts=el("div","actions");
+        var x=el("button","sm delmsg",pendMsg===m.id?"Удалить?":"Удалить пост"); x.type="button";
+        x.setAttribute("aria-label","Удалить пост");
+        x.onclick=function(){
+          if(pendMsg!==m.id){ pendMsg=m.id; renderMsgs(); return; }
+          pendMsg=null;
+          fbdb.collection("channels").doc(cur).collection("messages").doc(m.id).delete().catch(function(e){ console.error("delmsg:",e); });
+        };
+        acts.appendChild(x); card.appendChild(acts);
+      }
+      box.appendChild(card);
+    });
+    if(force) box.scrollTop=0;
+  }
   function render(force){ renderList(); renderMe(); renderMembers(); renderMsgs(force); }
 
   function enter(name){
@@ -530,7 +592,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     return true;
   }
   function lockText(){
-    if(READONLY[cur]&&fbReady&&!amAdmin()) return cur==="scripts"?"Публикуют только администраторы":"Следите за новостями";
+    if(READONLY[cur]&&fbReady&&!amAdmin()) return cur==="scripts"?"Посты публикуют только администраторы":"Следите за новостями";
     var m=me&&muteOf(me.key); return m?"Вы в муте "+muteLabel(m):"Следите за новостями";
   }
   function clearAttach(){ pendImg=null; $("prev").hidden=true; $("prevImg").removeAttribute("src"); $("file").value=""; }
