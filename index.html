@@ -105,8 +105,6 @@ button.ava:hover{background-color:var(--dim)}
 @media (prefers-reduced-motion:reduce){.adm,.mod,h1{animation:none}h1{background-image:linear-gradient(90deg,#fff,#888,#fff)}}
 .bdg{display:inline-block;border:2px solid var(--fg);border-radius:999px;padding:0 .45rem;font-size:.7rem;line-height:1.35;margin-left:.4rem;font-weight:500}
 .m .b{flex:1}
-.delmsg{margin-left:auto;align-self:flex-start;opacity:.5;min-width:2.3rem;padding:.3rem .6rem}
-.m:hover .delmsg,.delmsg:focus-visible{opacity:1}
 .mlist li{display:flex;align-items:center;gap:.3rem}
 .mlist li>button:first-child{flex:1;min-width:0}
 .mlist .nline{display:flex;align-items:center;min-width:0}
@@ -156,13 +154,13 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .top small{opacity:.7;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .back{display:none;background:none;border:2px solid var(--fg);border-radius:50%;width:2.4rem;height:2.4rem;padding:0;place-items:center;flex:none;min-width:2.4rem}
 .msgs{flex:1;overflow-y:auto;padding:1rem 1.25rem;position:relative}
-.m{display:flex;gap:.8rem;padding:.4rem 0;position:relative;transition:background .2s,transform .15s;touch-action:pan-y}
+.m{display:flex;gap:.8rem;padding:.4rem 0;position:relative;transition:background .2s,transform .15s;touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .m .b{min-width:0;flex:1}
 .m .h{display:flex;align-items:baseline;gap:.5rem}
 .nm{background-color:transparent;border:0;padding:0;font-weight:500}
 .m .nm:hover,.fcard .nm:hover{text-decoration:underline;text-decoration-color:var(--fg)}
 .m time{font-size:.78rem;opacity:.6}
-.m p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
+.m p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;user-select:text;-webkit-user-select:text}
 .mention{color:#c084fc;background:rgba(168,85,247,.15);border-radius:.3rem;padding:0 .2rem;font-weight:500}
 .m.highlight{background:rgba(168,85,247,.18);border-radius:.5rem;animation:hlPulse 1.2s ease-out}
 @keyframes hlPulse{0%{background:rgba(168,85,247,.5)}100%{background:rgba(168,85,247,.18)}}
@@ -170,9 +168,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .m .reply-quote:hover{background:rgba(255,255,255,.1)}
 .m .reply-quote .rq-name{font-size:.78rem;font-weight:500;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .m .reply-quote .rq-text{font-size:.82rem;opacity:.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.m .reply-btn{position:absolute;right:.4rem;top:.35rem;opacity:0;min-width:2rem;padding:.15rem .45rem;font-size:.9rem;line-height:1;border:2px solid var(--fg);border-radius:50%;background:var(--bg);color:var(--fg);transition:opacity .15s,background .15s}
-.m:hover .reply-btn,.m .reply-btn:focus-visible{opacity:.7}
-.m .reply-btn:hover{opacity:1;background:var(--fg);color:var(--bg)}
 .empty{margin:2rem auto;text-align:center;opacity:.7}
 @keyframes msgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .fcard{border:2px solid var(--fg);border-radius:1rem;padding:.9rem 1rem;margin:0 0 .8rem;display:flex;flex-direction:column;gap:.5rem;transition:background .15s,transform .15s}
@@ -202,6 +197,15 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .mention-drop button:last-child{border-bottom:0}
 .mention-drop button:hover,.mention-drop button.sel{background:var(--dim)}
 .mention-drop .ava{width:1.6rem;height:1.6rem;font-size:.75rem;border-width:1px}
+
+.ctxmenu{position:fixed;z-index:30;background:#141414;border:2px solid var(--fg);border-radius:.7rem;overflow:hidden;min-width:11rem;box-shadow:0 12px 40px rgba(0,0,0,.85);animation:ctxIn .12s ease-out}
+@keyframes ctxIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.ctxmenu button{display:flex;align-items:center;gap:.6rem;width:100%;text-align:left;background:none;border:0;padding:.65rem 1rem;color:var(--fg);font-size:.92rem;font-weight:500;border-bottom:1px solid rgba(255,255,255,.1);transition:background .15s}
+.ctxmenu button:last-child{border-bottom:0}
+.ctxmenu button:hover{background:var(--dim)}
+.ctxmenu button.danger{color:#ff4d4d}
+.ctxmenu button.danger:hover{background:#ff4d4d;color:#fff}
+.ctxmenu .ico{font-size:1.1rem;width:1.4rem;display:inline-grid;place-items:center}
 
 .frow{display:flex;align-items:center;gap:.5rem;padding:.5rem 1.25rem;border-top:2px solid var(--fg)}
 .frow span{font-weight:500;font-size:.9rem;flex:none;opacity:.85}
@@ -246,7 +250,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   .top .sm{padding:.3rem .7rem;font-size:.82rem;min-height:2rem}
   .frow{flex-direction:column;align-items:stretch;gap:.3rem}
   .frow input{width:100%}
-  .m .reply-btn{opacity:.35;right:0;top:.2rem}
 }
 </style>
 </head>
@@ -336,6 +339,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 </div>
 
 <div class="modal" id="modal" hidden><div class="card" id="pcard"></div></div>
+<div class="ctxmenu" id="ctxMenu" hidden></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -357,6 +361,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var dms={}, unsubDMs=null, dmUser=null, unsubDM=null, dmData=[];
   var replyTo=null;
   var mentionOpen=false, mentionItems=[], mentionSel=0;
+  var ctxMsg=null;
 
   var I18N = {
     ru: {
@@ -797,9 +802,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     var last = 0, m;
     while((m = re.exec(text)) !== null){
       if(m.index>last) container.appendChild(document.createTextNode(text.slice(last, m.index)));
-      var sp = document.createElement("span");
-      sp.className = "mention";
-      sp.textContent = "@"+m[1];
+      var sp = document.createElement("span"); sp.className = "mention"; sp.textContent = "@"+m[1];
       container.appendChild(sp);
       last = m.index + m[0].length;
     }
@@ -825,7 +828,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function scrollToMsg(id){
     var nodes = $("msgs").querySelectorAll('[data-mid="'+id+'"]');
     if(!nodes.length){
-      // попробуем найти в data и переключиться если надо
       try{ $("serr").textContent=t('msg_not_found'); $("serr").hidden=false; setTimeout(function(){ $("serr").hidden=true; },2000); }catch(e){}
       return;
     }
@@ -833,6 +835,135 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     n.scrollIntoView({behavior:"smooth", block:"center"});
     n.classList.add("highlight");
     setTimeout(function(){ n.classList.remove("highlight"); }, 1400);
+  }
+
+  // ========== Контекстное меню ==========
+  function closeCtxMenu(){
+    ctxMsg = null;
+    var menu = $("ctxMenu");
+    menu.hidden = true;
+    menu.innerHTML = "";
+  }
+  function openCtxMenu(x, y, m){
+    if(!m || !m.id) return;
+    ctxMsg = m;
+    var menu = $("ctxMenu");
+    menu.innerHTML = "";
+
+    var bReply = el("button"); bReply.type="button";
+    bReply.appendChild(el("span","ico","↩"));
+    bReply.appendChild(document.createTextNode(t('reply_btn')));
+    bReply.onclick = function(e){
+      e.stopPropagation();
+      var target = ctxMsg;
+      closeCtxMenu();
+      setReply(target);
+    };
+    menu.appendChild(bReply);
+
+    if(fbReady && amAdmin()){
+      var bDel = el("button","danger"); bDel.type="button";
+      bDel.appendChild(el("span","ico","×"));
+      bDel.appendChild(document.createTextNode(t('del_msg')));
+      bDel.onclick = function(e){
+        e.stopPropagation();
+        var target = ctxMsg;
+        closeCtxMenu();
+        deleteMessage(target);
+      };
+      menu.appendChild(bDel);
+    }
+
+    // показать, измерить, спозиционировать
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    menu.hidden = false;
+    var rect = menu.getBoundingClientRect();
+    var ww = window.innerWidth, wh = window.innerHeight;
+    var mx = Math.min(x, ww - rect.width - 8);
+    var my = Math.min(y, wh - rect.height - 8);
+    if(mx < 8) mx = 8;
+    if(my < 8) my = 8;
+    menu.style.left = mx + "px";
+    menu.style.top = my + "px";
+  }
+  document.addEventListener("click", function(e){
+    if($("ctxMenu").hidden) return;
+    if(!$("ctxMenu").contains(e.target)) closeCtxMenu();
+  });
+  document.addEventListener("contextmenu", function(e){
+    if(!$("ctxMenu").hidden && !$("ctxMenu").contains(e.target)) closeCtxMenu();
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.key==="Escape" && !$("ctxMenu").hidden){ closeCtxMenu(); }
+  });
+
+  function deleteMessage(m){
+    if(!m || !m.id) return;
+    if(!confirm(t('del_confirm'))) return;
+    var coll = dmUser
+      ? fbdb.collection("dms").doc(dmUser).collection("messages")
+      : fbdb.collection("channels").doc(cur).collection("messages");
+    coll.doc(m.id).delete().catch(function(e){ console.error("delmsg:",e); });
+  }
+
+  function attachMsgHandlers(row, m){
+    if(!row || !m || !m.id) return;
+    // контекстное меню на правый клик (десктоп)
+    row.addEventListener("contextmenu", function(e){
+      e.preventDefault();
+      openCtxMenu(e.clientX, e.clientY, m);
+    });
+    // свайп вправо = reply (мобилка), долгий тап = меню
+    var startX=0, startY=0, active=false, done=false, threshold=60;
+    var lpTimer=null, lpMoved=false, lpStarted=false;
+    row.addEventListener("touchstart", function(e){
+      if(e.touches.length!==1) return;
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+      active = true; done = false;
+      lpMoved = false; lpStarted = false;
+      var tx = startX, ty = startY;
+      lpTimer = setTimeout(function(){
+        if(!lpMoved && active){
+          lpStarted = true;
+          openCtxMenu(tx, ty, m);
+          if(navigator.vibrate) try{ navigator.vibrate(20); }catch(e){}
+        }
+      }, 500);
+    }, {passive:true});
+    row.addEventListener("touchmove", function(e){
+      if(!active) return;
+      var dx = e.touches[0].clientX - startX;
+      var dy = e.touches[0].clientY - startY;
+      if(Math.abs(dx) > 10 || Math.abs(dy) > 10) lpMoved = true;
+      if(Math.abs(dy) > 30 || lpStarted){ active = false; clearTimeout(lpTimer); return; }
+      if(dx > threshold && Math.abs(dy) < 40 && !done){
+        row.style.transform = "translateX("+Math.min(dx-40, 40)+"px)";
+      }
+      if(dx > 100 && !done){ done = true; row.style.transform=""; setReply(m); active=false; clearTimeout(lpTimer); }
+    }, {passive:true});
+    row.addEventListener("touchend", function(){
+      row.style.transform="";
+      clearTimeout(lpTimer);
+      active=false;
+    }, {passive:true});
+    row.addEventListener("touchcancel", function(){
+      row.style.transform="";
+      clearTimeout(lpTimer);
+      active=false;
+    }, {passive:true});
+  }
+
+  function buildReplyQuote(m){
+    if(!m.reply || !m.reply.name) return null;
+    var q = el("div","reply-quote");
+    q.setAttribute("role","button");
+    q.tabIndex = 0;
+    q.appendChild(el("div","rq-name", m.reply.name));
+    var rtext = m.reply.text || ("📷 "+t('photo'));
+    q.appendChild(el("div","rq-text", rtext));
+    q.onclick=function(){ scrollToMsg(m.reply.id); };
+    return q;
   }
 
   function chan(){ return CH.filter(function(c){return c.id===cur})[0]; }
@@ -847,6 +978,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         if(c.forum){ b.innerHTML=FORUM_SVG; b.appendChild(document.createTextNode(c.name)); }
         else { b.textContent="# "+c.name; }
         b.onclick=function(){
+          closeCtxMenu();
           dmUser=null; if(unsubDM){ unsubDM(); unsubDM=null; } dmData=[]; replyTo=null; updateReplyPreview();
           $("dmLockBtn").hidden=true; $("dmDelBtn").hidden=true; $("memBtn").hidden=false;
           cur=c.id; delete unreadCh[c.id]; lastSeenCh[c.id]=Date.now();
@@ -877,7 +1009,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       var acc=getAcc(k); var nm=(acc&&acc.name)||k;
       var label = amAdmin() ? nm : t('admin_word_short');
       b.textContent = label + (d && d.closed ? " 🔒" : "");
-      b.onclick=function(){ openDM(k); };
+      b.onclick=function(){ closeCtxMenu(); openDM(k); };
       li.appendChild(b); dml.appendChild(li);
     });
   }
@@ -890,48 +1022,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       else if(role === "mod" && cur !== "scripts" && cur !== "announcements") show = true;
     }
     $("clearBtn").hidden = !show;
-  }
-
-  function attachReplySwipe(row, m){
-    if(!row || !m || !m.id) return;
-    var startX=0, startY=0, active=false, done=false, threshold=60;
-    row.addEventListener("touchstart", function(e){
-      if(e.touches.length!==1) return;
-      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-      active = true; done = false;
-    }, {passive:true});
-    row.addEventListener("touchmove", function(e){
-      if(!active || done) return;
-      var dx = e.touches[0].clientX - startX;
-      var dy = e.touches[0].clientY - startY;
-      if(Math.abs(dy) > 30) { active = false; return; }
-      if(dx > threshold){
-        // свайп вправо = reply
-        if(dx > 0 && Math.abs(dy) < 40){
-          row.style.transform = "translateX("+Math.min(dx-40, 40)+"px)";
-        }
-        if(dx > 100){ done = true; row.style.transform=""; setReply(m); active=false; }
-      }
-    }, {passive:true});
-    row.addEventListener("touchend", function(){
-      row.style.transform="";
-      if(!done && active){
-        // если свайп был, но недостаточный — просто сброс
-      }
-      active = false;
-    }, {passive:true});
-  }
-
-  function buildReplyQuote(m){
-    if(!m.reply || !m.reply.name) return null;
-    var q = el("div","reply-quote");
-    q.setAttribute("role","button");
-    q.tabIndex = 0;
-    q.appendChild(el("div","rq-name", m.reply.name));
-    var rtext = m.reply.text || ("📷 "+t('photo'));
-    q.appendChild(el("div","rq-text", rtext));
-    q.onclick=function(){ scrollToMsg(m.reply.id); };
-    return q;
   }
 
   function renderMsgs(force){
@@ -947,7 +1037,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     list.forEach(function(m){
       var acc=getAcc(m.by), name=acc?acc.name:m.name, row=el("div","m");
       row.setAttribute("data-mid", m.id);
-      attachReplySwipe(row, m);
+      attachMsgHandlers(row, m);
       var a=el("button","ava"); a.type="button"; paint(a,acc,name); a.setAttribute("aria-label",t('profile_aria')+name);
       a.onclick=function(){ openProfile(m.by,name); };
       var b=el("div","b");
@@ -967,19 +1057,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         ib.onclick=function(){ openImage(m.image); }; ib.appendChild(im); b.appendChild(ib);
       }
       row.appendChild(a); row.appendChild(b);
-      // кнопка Reply
-      var rbtn = el("button","reply-btn","↩"); rbtn.type="button"; rbtn.setAttribute("aria-label", t('reply_btn'));
-      rbtn.onclick=function(e){ e.stopPropagation(); setReply(m); };
-      row.appendChild(rbtn);
-      if(fbReady&&amAdmin()&&m.id){
-        var x=el("button","sm delmsg",pendMsg===m.id?t('del_confirm'):"×"); x.type="button";
-        x.onclick=function(){
-          if(pendMsg!==m.id){ pendMsg=m.id; renderMsgs(); return; }
-          pendMsg=null;
-          fbdb.collection("channels").doc(cur).collection("messages").doc(m.id).delete().catch(function(e){ console.error("delmsg:",e); });
-        };
-        row.appendChild(x);
-      }
       box.appendChild(row);
     });
     if(force||near) box.scrollTop=box.scrollHeight;
@@ -1010,7 +1087,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       var acc2=getAcc(m.by), name=acc2?acc2.name:(m.name||m.by);
       var row=el("div","m");
       row.setAttribute("data-mid", m.id);
-      attachReplySwipe(row, m);
+      attachMsgHandlers(row, m);
       var a=el("button","ava"); a.type="button"; paint(a,acc2,name);
       a.onclick=function(){ openProfile(m.by,name); };
       var b=el("div","b");
@@ -1024,14 +1101,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       b.appendChild(h);
       var p=el("p"); renderTextWithMentions(p, m.text); b.appendChild(p);
       row.appendChild(a); row.appendChild(b);
-      var rbtn = el("button","reply-btn","↩"); rbtn.type="button"; rbtn.setAttribute("aria-label", t('reply_btn'));
-      rbtn.onclick=function(e){ e.stopPropagation(); setReply(m); };
-      row.appendChild(rbtn);
-      if(fbReady && amAdmin() && m.id){
-        var x=el("button","sm delmsg","×"); x.type="button";
-        x.onclick=function(){ fbdb.collection("dms").doc(dmUser).collection("messages").doc(m.id).delete().catch(function(e){ console.error(e); }); };
-        row.appendChild(x);
-      }
       box.appendChild(row);
     });
     box.scrollTop=box.scrollHeight;
@@ -1266,7 +1335,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   };
   $("prevX").onclick=clearAttach;
 
-  // Mention dropdown logic
+  // Mention dropdown
   function closeMentionDrop(){ mentionOpen=false; mentionItems=[]; mentionSel=0; $("mentionDrop").hidden=true; $("mentionDrop").innerHTML=""; }
   function renderMentionDrop(){
     var drop=$("mentionDrop"); drop.innerHTML="";
@@ -1278,10 +1347,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       var a=el("span","ava"); paint(a, it.acc, it.name);
       b.appendChild(a);
       b.appendChild(document.createTextNode(it.name));
-      b.onmousedown=function(e){
-        e.preventDefault();
-        applyMention(it.name);
-      };
+      b.onmousedown=function(e){ e.preventDefault(); applyMention(it.name); };
       drop.appendChild(b);
     });
   }
@@ -1292,9 +1358,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(m){
       var prefix = v.slice(0, v.length - m[0].length);
       v = prefix + (m[1]||" ") + "@"+name+" ";
-    } else {
-      v = v + "@"+name+" ";
-    }
+    } else { v = v + "@"+name+" "; }
     inp.value = v;
     closeMentionDrop();
     inp.focus();
@@ -1308,9 +1372,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     var list = [];
     Object.keys(src).forEach(function(k){
       var acc = src[k]; var nm=(acc&&acc.name)||k;
-      if(nm.toLowerCase().indexOf(q)===0){
-        list.push({key:k, name:nm, acc:acc});
-      }
+      if(nm.toLowerCase().indexOf(q)===0) list.push({key:k, name:nm, acc:acc});
     });
     list.sort(function(a,b){ return a.name.localeCompare(b.name); });
     list = list.slice(0, 8);
@@ -1365,11 +1427,12 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(data[cur].length>500) data[cur]=data[cur].slice(-500);
     wr(SRV,data); $("input").value=""; if($("titleInput")) $("titleInput").value=""; clearReply(); renderMsgs(true);
   };
-  $("back").onclick=function(){ if(dmUser){ closeDM(); app.classList.remove("open"); return; } app.classList.remove("open"); };
+  $("back").onclick=function(){ closeCtxMenu(); if(dmUser){ closeDM(); app.classList.remove("open"); return; } app.classList.remove("open"); };
   $("memBtn").onclick=function(){ app.classList.add("showmem"); };
   $("memX").onclick=function(){ app.classList.remove("showmem"); };
   $("clearBtn").onclick=function(){ if(dmUser) return; clearChannel(cur); };
   $("out").onclick=function(){
+    closeCtxMenu();
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
     if(unsubDMs){ unsubDMs(); unsubDMs=null; }
