@@ -55,7 +55,7 @@ button.ava:hover{background-color:var(--dim)}
 .tabs button{flex:1;background:transparent;border:0;padding:.55rem;font-weight:500;transition:background .28s ease,color .28s ease,transform .15s ease}
 .tabs button:active{transform:scale(.97)}
 .tabs button[aria-selected=true]{background:var(--fg);color:var(--bg)}
-.card label{display:block;font-weight:500;margin-bottom:.9rem;max-height:120px;opacity:1;overflow:hidden;transform:translateY(0);transition:opacity .28s cubic-bezier(.2,.7,.3,1),max-height .35s cubic-bezier(.2,.7,.3,1),margin-bottom .3s cubic-bezier(.2,.7,.3,1),transform .3s cubic-bezier(.2,.7,.3,1)}
+.card label{display:block;font-weight:500;margin-bottom:.9rem;max-height:120px;opacity:1;overflow:clip;overflow-clip-margin:8px;transform:translateY(0);transition:opacity .28s cubic-bezier(.2,.7,.3,1),max-height .35s cubic-bezier(.2,.7,.3,1),margin-bottom .3s cubic-bezier(.2,.7,.3,1),transform .3s cubic-bezier(.2,.7,.3,1)}
 .card label.off{max-height:0;opacity:0;margin-bottom:0;transform:translateY(-8px);pointer-events:none}
 .card input:not([type=file]),.card textarea{display:block;width:100%;margin-top:.3rem;border:2px solid var(--fg);border-radius:.7rem;padding:.65rem .9rem;background:var(--bg);resize:vertical}
 .eye{margin-bottom:.9rem}
