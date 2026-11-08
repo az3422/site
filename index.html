@@ -98,7 +98,9 @@ button.ava:hover{background-color:var(--dim)}
 .mod{background-image:linear-gradient(90deg,#2f7bff,#a8ccff,#2f7bff,#a8ccff,#2f7bff)}
 .adm .bdg,.mod .bdg{color:var(--fg);-webkit-text-fill-color:var(--fg)}
 @keyframes shimmer{from{background-position:0% center}to{background-position:300% center}}
-@media (prefers-reduced-motion:reduce){.adm,.mod{animation:none}}
+@media (prefers-reduced-motion:reduce){.adm,.mod{animation:none}.list li.unread button::before{animation:none;background:linear-gradient(90deg,#a855f7,#e879f9,#a855f7)}}
+.list li.unread button{position:relative}
+.list li.unread button::before{content:"";position:absolute;inset:0;padding:2px;border-radius:.6rem;background:linear-gradient(90deg,#a855f7,#e879f9,#c084fc,#e879f9,#a855f7);background-size:300% 100%;animation:shimmer 3.2s linear infinite;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
 .bdg{display:inline-block;border:2px solid var(--fg);border-radius:999px;padding:0 .45rem;font-size:.7rem;line-height:1.35;margin-left:.4rem;font-weight:500}
 .m .b{flex:1}
 .delmsg{margin-left:auto;align-self:flex-start;opacity:.5;min-width:2.3rem;padding:.3rem .6rem}
@@ -251,7 +253,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 
 <div class="modal" id="modal" hidden><div class="card" id="pcard"></div></div>
 
-<!-- Firebase SDK (только для сообщений и админки) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
@@ -266,8 +267,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var FORUM_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:middle;margin-right:.4rem" aria-hidden="true"><path d="M3 4h18v2H3V4zm0 5h18v2H3V9zm0 5h18v2H3v-2z"/></svg>';
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="", swapUntil=0, loadedCh={};
+  var unreadCh={}, lastSeenCh={}, unsubAll={}, firstSnapCh={};
 
-  
   var firebaseConfig = {
     apiKey:            "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
     authDomain:        "divine-net.firebaseapp.com",
@@ -278,7 +279,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   };
   var fbReady=false, fbdb=null;
   var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=90000, roles={}, bans={}, unsubRoles=null, unsubBans=null, pendMsg=null, pendBan=null, pendImg=null, mutes={}, unsubMutes=null;
-  var remoteUsers={};   
+  var remoteUsers={};
   try{
     if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
       firebase.initializeApp(firebaseConfig);
@@ -312,11 +313,37 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       }, function(e){ console.error("messages:",e); loadedCh[channelId]=true; if(cur===channelId) renderMsgs(); });
   }
 
-  
+  function watchAllChannels(){
+    if(!fbReady) return;
+    CH.forEach(function(c){
+      if(unsubAll[c.id]) return;
+      firstSnapCh[c.id]=true;
+      unsubAll[c.id]=fbdb.collection("channels").doc(c.id).collection("messages")
+        .orderBy("createdAt","desc").limit(1)
+        .onSnapshot(function(snap){
+          var latest=null;
+          snap.forEach(function(d){
+            var x=d.data();
+            var t=x.createdAt?x.createdAt.toDate().getTime():0;
+            if(!latest||t>latest.t) latest={t:t,by:x.by};
+          });
+          if(!latest) return;
+          if(firstSnapCh[c.id]){ firstSnapCh[c.id]=false; lastSeenCh[c.id]=latest.t; return; }
+          if(c.id===cur){ lastSeenCh[c.id]=latest.t; delete unreadCh[c.id]; return; }
+          if(latest.by!==me.key && latest.t>(lastSeenCh[c.id]||0)){
+            if(!unreadCh[c.id]){ unreadCh[c.id]=true; renderList(); }
+          }
+        },function(e){ console.error("watch:"+c.id,e); });
+    });
+  }
+  function stopWatchAll(){
+    Object.keys(unsubAll).forEach(function(k){ try{ unsubAll[k](); }catch(e){} });
+    unsubAll={}; firstSnapCh={}; unreadCh={}; lastSeenCh={};
+  }
+
   function subscribeUsers(){
     if(!fbReady) return;
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
-    /* Сразу тянем всё принудительно (сработает даже если onSnapshot тормозит) */
     fbdb.collection("users").get().then(function(snap){
       var tmp={};
       snap.forEach(function(d){ tmp[d.id]=d.data(); });
@@ -324,7 +351,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       if(me){ renderMe(); renderMembers(); }
       renderMsgs();
     }).catch(function(e){ console.error("users.get:",e); });
-    /* И параллельно подписка на обновления */
     unsubUsers = fbdb.collection("users").onSnapshot(function(snap){
       var tmp={};
       snap.forEach(function(d){ tmp[d.id]=d.data(); });
@@ -334,7 +360,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     }, function(e){ console.error("users:",e); });
   }
 
-  /* ===== Онлайн-статус, список участников, удалённые аккаунты ===== */
   function isOnline(key){
     if(me&&key===me.key) return true;
     var t=presence[key]; return !!t&&Date.now()-t<PRES_TTL;
@@ -472,8 +497,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     },function(){});
   }
 
-  /* Имя занимается одной операцией. Имя считается занятым, если есть аккаунт ИЛИ профиль
-     (старые аккаунты, ещё не перенесённые в accounts, тоже защищены). Регистр букв не важен. */
   function claimAccount(key,name,salt,h,ownsProfile){
     var ref=fbdb.collection("accounts").doc(key), uref=fbdb.collection("users").doc(key);
     return fbdb.runTransaction(function(tx){
@@ -490,7 +513,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(!fbReady) return;
     fbdb.collection("users").doc(key).set(payload,{merge:true}).catch(function(e){console.error("saveUser:",e);});
   }
-  /* ========================================================================= */
 
   function rd(k,d){ try{ var v=JSON.parse(localStorage.getItem(k)); return v==null?d:v; }catch(e){ return d; } }
   function wr(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
@@ -511,7 +533,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
   function getAcc(key){ return fbReady ? (remoteUsers[key]||null) : (users()[key]||null); }
 
-  /* ---------- мессенджер ---------- */
   function chan(){ return CH.filter(function(c){return c.id===cur})[0]; }
   function renderList(){
     var ul=$("list"); ul.innerHTML="";
@@ -520,10 +541,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       if(!items.length) return;
       ul.appendChild(el("li","cat",g[0]));
       items.forEach(function(c){
-        var li=el("li",c.id===cur?"on":""), b=el("button"); b.type="button";
+        var li=el("li", c.id===cur ? "on" : (unreadCh[c.id] ? "unread" : "")), b=el("button"); b.type="button";
         if(c.forum){ b.innerHTML=FORUM_SVG; b.appendChild(document.createTextNode(c.name)); }
         else { b.textContent="# "+c.name; }
-        b.onclick=function(){ cur=c.id; app.classList.add("open"); if(fbReady) subscribeMessages(cur); swapUntil=Date.now()+1500; render(true); $("input").focus(); };
+        b.onclick=function(){ cur=c.id; delete unreadCh[c.id]; lastSeenCh[c.id]=Date.now(); app.classList.add("open"); if(fbReady) subscribeMessages(cur); swapUntil=Date.now()+1500; render(true); $("input").focus(); };
         li.appendChild(b); ul.appendChild(li);
       });
     });
@@ -618,7 +639,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(force) box.scrollTop=0;
     animateIn(box,false,true);
   }
-  /* Плавное появление сообщений после переключения канала или форума */
   function animateIn(box,fromEnd,hasContent){
     if(Date.now()>swapUntil) return;
     if(hasContent) swapUntil=0;
@@ -635,7 +655,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     me={key:name.toLowerCase(),name:name};
     try{ localStorage.setItem(SESSION,name); }catch(e){}
     loadData();
-    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); }
+    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels(); }
     hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
   }
   function muteIcon(key){
@@ -723,7 +743,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   $("out").onclick=function(){
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
-    stopPresence(true); if(unsubDel){ unsubDel(); unsubDel=null; }
+    stopPresence(true); stopWatchAll(); if(unsubDel){ unsubDel(); unsubDel=null; }
     if(unsubRoles){ unsubRoles(); unsubRoles=null; } if(unsubBans){ unsubBans(); unsubBans=null; } if(unsubMutes){ unsubMutes(); unsubMutes=null; }
     roles={}; bans={}; mutes={}; pendMsg=null; pendBan=null;
     remoteUsers={}; presence={};
@@ -736,7 +756,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(e.key===USERS){ renderMe(); renderMsgs(); }
   });
 
-  /* ---------- профиль ---------- */
   function closeProfile(){ $("modal").hidden=true; $("pcard").classList.remove("wide"); draft=null; }
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeProfile(); });
   $("modal").addEventListener("click",function(e){ if(e.target===$("modal")) closeProfile(); });
@@ -759,7 +778,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     r.readAsDataURL(file);
   }
 
-  /* ===== ФУНКЦИЯ ИЗМЕНЕНА: добавлен fallback через get() ===== */
   function loadBanner(key,cb){
     if(!fbReady||!roleOf(key)){ cb(""); return; }
     if(key in bannerCache){ cb(bannerCache[key]); return; }
@@ -839,7 +857,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     return p;
   }
   function openProfile(key,name){
-    /* Если профиль ещё не подгружен — тянем его напрямую из Firestore */
     if(!getAcc(key) && fbReady){
       var _box=$("pcard"); _box.innerHTML=""; $("modal").hidden=false;
       _box.appendChild(el("p","empty","Загрузка профиля…"));
@@ -933,7 +950,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     sync();
   }
 
-  /* ---------- вход, регистрация, админ ---------- */
   function hidePw(){
     $("eye").setAttribute("aria-pressed","false"); $("eye").textContent="Показать пароль";
     $("p").type="password"; $("p2").type="password";
@@ -982,7 +998,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     $("adminView").hidden=!on;
   }
   function showAdmin(){
-    /* Если Firebase подключён — показываем ВСЕХ со всех устройств */
     if(fbReady){
       adminToggle(true);
       $("adCount").textContent="Загрузка…";
@@ -1049,7 +1064,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       });
       return;
     }
-    /* Fallback: старый локальный список */
     var all=users(), keys=Object.keys(all).sort(), ul=$("adList"); ul.innerHTML="";
     keys.forEach(function(k){
       var li=el("li"), a=el("span","ava s"); paint(a,all[k],all[k].name);
@@ -1084,7 +1098,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(pw.length<6){ err.textContent="Пароль должен быть не короче 6 символов."; return; }
     var all=users(), key=name.toLowerCase();
     if(!fbReady){
-      /* без Firebase: старая локальная схема */
       if(mode==="up"){
         if(pw!==$("p2").value){ err.textContent="Пароли не совпадают."; return; }
         if(all[key]){ err.textContent="Такое имя уже занято."; return; }
@@ -1105,7 +1118,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       }
       return;
     }
-    /* с Firebase: аккаунты общие для всех устройств */
     var TAKEN="Такое имя уже занято (регистр букв не важен). Если это ваш аккаунт, откройте вкладку «Вход».";
     var srvErr=function(e){ console.error("auth:",e); err.textContent="Не удалось связаться с сервером. Попробуйте позже."; };
     if(mode==="up"){
@@ -1128,7 +1140,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
           enterChecked(ac.name||name);
         });
       }
-      /* в базе аккаунта нет: пробуем перенести старый аккаунт, созданный на этом устройстве */
       var la=all[key];
       if(!la){ err.textContent="Аккаунт не найден. Создайте его на вкладке «Регистрация»."; return; }
       return Promise.all([hash(pw,la.salt),checkDeleted(key)]).then(function(r){
