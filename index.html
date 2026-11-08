@@ -38,9 +38,14 @@ button.ava:hover{background-color:var(--dim)}
 .sm{background:none;border:2px solid var(--fg);border-radius:999px;padding:.4rem 1rem;font-size:.9rem;line-height:1.2;min-height:2.3rem;white-space:nowrap;flex:none}
 .sm:hover,.sm[aria-pressed=true]{background:var(--fg);color:var(--bg)}
 
-.auth,.modal{position:fixed;inset:0;z-index:5;background:var(--bg);display:grid;place-items:center;padding:1.25rem;overflow-y:auto}
+.auth,.modal{position:fixed;inset:0;z-index:5;background:var(--bg);display:grid;place-items:center;padding:1.25rem;overflow-y:auto;overflow-x:hidden}
+.auth::before,.auth::after{content:"";position:fixed;border-radius:50%;pointer-events:none;filter:blur(70px);animation:authBlob 24s ease-in-out infinite}
+.auth::before{width:70vmin;height:70vmin;top:-20vmin;left:-20vmin;background:radial-gradient(circle,rgba(255,255,255,.22),transparent 65%)}
+.auth::after{width:60vmin;height:60vmin;bottom:-20vmin;right:-20vmin;background:radial-gradient(circle,rgba(255,255,255,.13),transparent 65%);animation-delay:-8s;animation-duration:28s}
+@keyframes authBlob{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(5vmin,-4vmin) scale(1.08)}}
 .modal{background:rgba(0,0,0,.88);z-index:8}
 .card{width:100%;max-width:24rem;border:2px solid var(--fg);border-radius:1.1rem;padding:1.75rem;background:var(--bg)}
+.auth .card{position:relative;z-index:1;background:rgba(8,8,8,.62);-webkit-backdrop-filter:blur(28px) saturate(160%);backdrop-filter:blur(28px) saturate(160%);box-shadow:0 30px 90px rgba(0,0,0,.75),0 0 60px rgba(255,255,255,.04),inset 0 1px 0 rgba(255,255,255,.04)}
 .card h1{font-weight:800;font-size:1.8rem;letter-spacing:-.03em;margin-bottom:.4rem}
 .card h2{font-weight:800;font-size:1.3rem;margin-bottom:.6rem}
 .card p{margin:0 0 1.25rem;opacity:.75}
@@ -217,7 +222,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 
 <div class="modal" id="modal" hidden><div class="card" id="pcard"></div></div>
 
-<!-- Firebase SDK (только для сообщений и админки) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
@@ -230,7 +234,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app");
 
-  
   var firebaseConfig = {
     apiKey:            "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
     authDomain:        "divine-net.firebaseapp.com",
@@ -241,7 +244,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   };
   var fbReady=false, fbdb=null;
   var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=90000, roles={}, bans={}, unsubRoles=null, unsubBans=null, pendMsg=null, pendBan=null, pendImg=null, mutes={}, unsubMutes=null;
-  var remoteUsers={};   
+  var remoteUsers={};
   try{
     if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
       firebase.initializeApp(firebaseConfig);
@@ -274,11 +277,9 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       }, function(e){ console.error("messages:",e); });
   }
 
-  
   function subscribeUsers(){
     if(!fbReady) return;
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
-    /* Сразу тянем всё принудительно (сработает даже если onSnapshot тормозит) */
     fbdb.collection("users").get().then(function(snap){
       var tmp={};
       snap.forEach(function(d){ tmp[d.id]=d.data(); });
@@ -286,7 +287,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       if(me){ renderMe(); renderMembers(); }
       renderMsgs();
     }).catch(function(e){ console.error("users.get:",e); });
-    /* И параллельно подписка на обновления */
     unsubUsers = fbdb.collection("users").onSnapshot(function(snap){
       var tmp={};
       snap.forEach(function(d){ tmp[d.id]=d.data(); });
@@ -296,7 +296,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     }, function(e){ console.error("users:",e); });
   }
 
-  /* ===== Онлайн-статус, список участников, удалённые аккаунты ===== */
   function isOnline(key){
     if(me&&key===me.key) return true;
     var t=presence[key]; return !!t&&Date.now()-t<PRES_TTL;
@@ -422,8 +421,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     },function(){});
   }
 
-  /* Имя занимается одной операцией. Имя считается занятым, если есть аккаунт ИЛИ профиль
-     (старые аккаунты, ещё не перенесённые в accounts, тоже защищены). Регистр букв не важен. */
   function claimAccount(key,name,salt,h,ownsProfile){
     var ref=fbdb.collection("accounts").doc(key), uref=fbdb.collection("users").doc(key);
     return fbdb.runTransaction(function(tx){
@@ -440,7 +437,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(!fbReady) return;
     fbdb.collection("users").doc(key).set(payload,{merge:true}).catch(function(e){console.error("saveUser:",e);});
   }
-  /* ========================================================================= */
 
   function rd(k,d){ try{ var v=JSON.parse(localStorage.getItem(k)); return v==null?d:v; }catch(e){ return d; } }
   function wr(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
@@ -461,7 +457,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
   function getAcc(key){ return remoteUsers[key] || users()[key] || null; }
 
-  /* ---------- мессенджер ---------- */
   function chan(){ return CH.filter(function(c){return c.id===cur})[0]; }
   function renderList(){
     var ul=$("list"); ul.innerHTML="";
@@ -609,7 +604,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(e.key===USERS){ renderMe(); renderMsgs(); }
   });
 
-  /* ---------- профиль ---------- */
   function closeProfile(){ $("modal").hidden=true; $("pcard").classList.remove("wide"); draft=null; }
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeProfile(); });
   $("modal").addEventListener("click",function(e){ if(e.target===$("modal")) closeProfile(); });
@@ -632,7 +626,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     r.readAsDataURL(file);
   }
 
-  /* ===== ФУНКЦИЯ ИЗМЕНЕНА: добавлен fallback через get() ===== */
   function adminPanel(key,name){
     var p=el("div","apanel"), mu=muteOf(key), bn=!!bans[key];
     var reopen=function(){ openProfile(key,name); }, fail=function(e){ console.error("admin:",e); };
@@ -670,7 +663,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     return p;
   }
   function openProfile(key,name){
-    /* Если профиль ещё не подгружен — тянем его напрямую из Firestore */
     if(!getAcc(key) && fbReady){
       var _box=$("pcard"); _box.innerHTML=""; $("modal").hidden=false;
       _box.appendChild(el("p","empty","Загрузка профиля…"));
@@ -736,7 +728,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     sync();
   }
 
-  /* ---------- вход, регистрация, админ ---------- */
   function hidePw(){
     $("eye").setAttribute("aria-pressed","false"); $("eye").textContent="Показать пароль";
     $("p").type="password"; $("p2").type="password";
@@ -767,7 +758,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     $("adminView").hidden=!on;
   }
   function showAdmin(){
-    /* Если Firebase подключён — показываем ВСЕХ со всех устройств */
     if(fbReady){
       adminToggle(true);
       $("adCount").textContent="Загрузка…";
@@ -827,7 +817,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       });
       return;
     }
-    /* Fallback: старый локальный список */
     var all=users(), keys=Object.keys(all).sort(), ul=$("adList"); ul.innerHTML="";
     keys.forEach(function(k){
       var li=el("li"), a=el("span","ava s"); paint(a,all[k],all[k].name);
@@ -862,7 +851,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(pw.length<6){ err.textContent="Пароль должен быть не короче 6 символов."; return; }
     var all=users(), key=name.toLowerCase();
     if(!fbReady){
-      /* без Firebase: старая локальная схема */
       if(mode==="up"){
         if(pw!==$("p2").value){ err.textContent="Пароли не совпадают."; return; }
         if(all[key]){ err.textContent="Такое имя уже занято."; return; }
@@ -883,7 +871,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       }
       return;
     }
-    /* с Firebase: аккаунты общие для всех устройств */
     var TAKEN="Такое имя уже занято (регистр букв не важен). Если это ваш аккаунт, откройте вкладку «Вход».";
     var srvErr=function(e){ console.error("auth:",e); err.textContent="Не удалось связаться с сервером. Попробуйте позже."; };
     if(mode==="up"){
@@ -906,7 +893,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
           enterChecked(ac.name||name);
         });
       }
-      /* в базе аккаунта нет: пробуем перенести старый аккаунт, созданный на этом устройстве */
       var la=all[key];
       if(!la){ err.textContent="Аккаунт не найден. Создайте его на вкладке «Регистрация»."; return; }
       return Promise.all([hash(pw,la.salt),checkDeleted(key)]).then(function(r){
