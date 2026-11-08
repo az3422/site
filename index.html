@@ -154,7 +154,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .top small{opacity:.7;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .back{display:none;background:none;border:2px solid var(--fg);border-radius:50%;width:2.4rem;height:2.4rem;padding:0;place-items:center;flex:none;min-width:2.4rem}
 .msgs{flex:1;overflow-y:auto;padding:1rem 1.25rem;position:relative}
-.m{display:flex;gap:.8rem;padding:.4rem 0;position:relative;transition:background .2s,transform .15s;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.m{display:flex;gap:.8rem;padding:.45rem .6rem;position:relative;transition:background .15s,transform .15s;touch-action:pan-y;user-select:none;-webkit-user-select:none;border-radius:.6rem;margin:0 -.6rem}
+.m:hover,.m.open-actions{background:rgba(255,255,255,.05)}
 .m .b{min-width:0;flex:1}
 .m .h{display:flex;align-items:baseline;gap:.5rem}
 .nm{background-color:transparent;border:0;padding:0;font-weight:500}
@@ -162,12 +163,18 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .m time{font-size:.78rem;opacity:.6}
 .m p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;user-select:text;-webkit-user-select:text}
 .mention{color:#c084fc;background:rgba(168,85,247,.15);border-radius:.3rem;padding:0 .2rem;font-weight:500}
-.m.highlight{background:rgba(168,85,247,.18);border-radius:.5rem;animation:hlPulse 1.2s ease-out}
+.m.highlight{background:rgba(168,85,247,.18);animation:hlPulse 1.2s ease-out}
 @keyframes hlPulse{0%{background:rgba(168,85,247,.5)}100%{background:rgba(168,85,247,.18)}}
 .m .reply-quote{display:flex;flex-direction:column;gap:.15rem;padding:.35rem .6rem;margin-bottom:.3rem;border-left:3px solid rgba(255,255,255,.5);background:rgba(255,255,255,.05);border-radius:.4rem;cursor:pointer;max-width:100%;transition:background .15s}
 .m .reply-quote:hover{background:rgba(255,255,255,.1)}
 .m .reply-quote .rq-name{font-size:.78rem;font-weight:500;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .m .reply-quote .rq-text{font-size:.82rem;opacity:.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-actions{position:absolute;right:.4rem;top:.3rem;display:flex;gap:.3rem;opacity:0;pointer-events:none;transition:opacity .15s;z-index:2;background:rgba(8,8,8,.75);backdrop-filter:blur(6px);padding:.15rem;border-radius:.5rem}
+.m:hover .m-actions,.m.open-actions .m-actions,.m .m-actions:focus-within{opacity:1;pointer-events:auto}
+.m-act-btn{width:1.9rem;height:1.9rem;padding:0;display:grid;place-items:center;border:2px solid var(--fg);border-radius:50%;background:var(--bg);color:var(--fg);font-size:.95rem;line-height:1;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.m-act-btn:hover{background:var(--fg);color:var(--bg)}
+.m-act-btn.danger{border-color:#ff4d4d;color:#ff4d4d}
+.m-act-btn.danger:hover{background:#ff4d4d;color:#fff;border-color:#ff4d4d}
 .empty{margin:2rem auto;text-align:center;opacity:.7}
 @keyframes msgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .fcard{border:2px solid var(--fg);border-radius:1rem;padding:.9rem 1rem;margin:0 0 .8rem;display:flex;flex-direction:column;gap:.5rem;transition:background .15s,transform .15s}
@@ -250,6 +257,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   .top .sm{padding:.3rem .7rem;font-size:.82rem;min-height:2rem}
   .frow{flex-direction:column;align-items:stretch;gap:.3rem}
   .frow input{width:100%}
+  .m-actions{opacity:.55;pointer-events:auto;background:transparent;backdrop-filter:none;padding:0}
+  .m-act-btn{width:1.7rem;height:1.7rem;font-size:.85rem}
 }
 </style>
 </head>
@@ -664,6 +673,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function roleWord(key){ var r=roleOf(key); return r==="admin"?t('admin_role'):r==="mod"?t('mod_role'):""; }
   function canModerate(key){ if(!me||!fbReady||key===me.key) return false; if(amAdmin()) return !isAdmin(key); if(isMod(me.key)) return !roleOf(key); return false; }
   function amAdmin(){ return !!me&&isAdmin(me.key); }
+  function amMod(){ return !!me&&isMod(me.key); }
+  function canDelete(){ return fbReady && (amAdmin() || amMod()); }
 
   function renderMembers(){
     if(!me) return;
@@ -837,69 +848,51 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     setTimeout(function(){ n.classList.remove("highlight"); }, 1400);
   }
 
-  // ========== Контекстное меню ==========
+  // Контекстное меню (правый клик / долгий тап)
   function closeCtxMenu(){
     ctxMsg = null;
     var menu = $("ctxMenu");
-    menu.hidden = true;
-    menu.innerHTML = "";
+    menu.hidden = true; menu.innerHTML = "";
   }
   function openCtxMenu(x, y, m){
     if(!m || !m.id) return;
     ctxMsg = m;
-    var menu = $("ctxMenu");
-    menu.innerHTML = "";
+    var menu = $("ctxMenu"); menu.innerHTML = "";
 
     var bReply = el("button"); bReply.type="button";
     bReply.appendChild(el("span","ico","↩"));
     bReply.appendChild(document.createTextNode(t('reply_btn')));
-    bReply.onclick = function(e){
-      e.stopPropagation();
-      var target = ctxMsg;
-      closeCtxMenu();
-      setReply(target);
-    };
+    bReply.onclick = function(e){ e.stopPropagation(); var target=ctxMsg; closeCtxMenu(); setReply(target); };
     menu.appendChild(bReply);
 
-    if(fbReady && amAdmin()){
+    if(canDelete()){
       var bDel = el("button","danger"); bDel.type="button";
       bDel.appendChild(el("span","ico","×"));
       bDel.appendChild(document.createTextNode(t('del_msg')));
-      bDel.onclick = function(e){
-        e.stopPropagation();
-        var target = ctxMsg;
-        closeCtxMenu();
-        deleteMessage(target);
-      };
+      bDel.onclick = function(e){ e.stopPropagation(); var target=ctxMsg; closeCtxMenu(); deleteMessage(target); };
       menu.appendChild(bDel);
     }
 
-    // показать, измерить, спозиционировать
-    menu.style.left = "0px";
-    menu.style.top = "0px";
-    menu.hidden = false;
+    menu.style.left = "0px"; menu.style.top = "0px"; menu.hidden = false;
     var rect = menu.getBoundingClientRect();
     var ww = window.innerWidth, wh = window.innerHeight;
     var mx = Math.min(x, ww - rect.width - 8);
     var my = Math.min(y, wh - rect.height - 8);
     if(mx < 8) mx = 8;
     if(my < 8) my = 8;
-    menu.style.left = mx + "px";
-    menu.style.top = my + "px";
+    menu.style.left = mx + "px"; menu.style.top = my + "px";
   }
   document.addEventListener("click", function(e){
     if($("ctxMenu").hidden) return;
     if(!$("ctxMenu").contains(e.target)) closeCtxMenu();
   });
-  document.addEventListener("contextmenu", function(e){
-    if(!$("ctxMenu").hidden && !$("ctxMenu").contains(e.target)) closeCtxMenu();
-  });
   document.addEventListener("keydown", function(e){
-    if(e.key==="Escape" && !$("ctxMenu").hidden){ closeCtxMenu(); }
+    if(e.key==="Escape" && !$("ctxMenu").hidden) closeCtxMenu();
   });
 
   function deleteMessage(m){
     if(!m || !m.id) return;
+    if(!canDelete()) return;
     if(!confirm(t('del_confirm'))) return;
     var coll = dmUser
       ? fbdb.collection("dms").doc(dmUser).collection("messages")
@@ -909,19 +902,14 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 
   function attachMsgHandlers(row, m){
     if(!row || !m || !m.id) return;
-    // контекстное меню на правый клик (десктоп)
-    row.addEventListener("contextmenu", function(e){
-      e.preventDefault();
-      openCtxMenu(e.clientX, e.clientY, m);
-    });
-    // свайп вправо = reply (мобилка), долгий тап = меню
+    row.addEventListener("contextmenu", function(e){ e.preventDefault(); openCtxMenu(e.clientX, e.clientY, m); });
+    // тап/долгий тап + свайп
     var startX=0, startY=0, active=false, done=false, threshold=60;
     var lpTimer=null, lpMoved=false, lpStarted=false;
     row.addEventListener("touchstart", function(e){
       if(e.touches.length!==1) return;
       startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-      active = true; done = false;
-      lpMoved = false; lpStarted = false;
+      active = true; done = false; lpMoved = false; lpStarted = false;
       var tx = startX, ty = startY;
       lpTimer = setTimeout(function(){
         if(!lpMoved && active){
@@ -942,28 +930,32 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       }
       if(dx > 100 && !done){ done = true; row.style.transform=""; setReply(m); active=false; clearTimeout(lpTimer); }
     }, {passive:true});
-    row.addEventListener("touchend", function(){
-      row.style.transform="";
-      clearTimeout(lpTimer);
-      active=false;
-    }, {passive:true});
-    row.addEventListener("touchcancel", function(){
-      row.style.transform="";
-      clearTimeout(lpTimer);
-      active=false;
-    }, {passive:true});
+    row.addEventListener("touchend", function(){ row.style.transform=""; clearTimeout(lpTimer); active=false; }, {passive:true});
+    row.addEventListener("touchcancel", function(){ row.style.transform=""; clearTimeout(lpTimer); active=false; }, {passive:true});
   }
 
   function buildReplyQuote(m){
     if(!m.reply || !m.reply.name) return null;
     var q = el("div","reply-quote");
-    q.setAttribute("role","button");
-    q.tabIndex = 0;
+    q.setAttribute("role","button"); q.tabIndex = 0;
     q.appendChild(el("div","rq-name", m.reply.name));
     var rtext = m.reply.text || ("📷 "+t('photo'));
     q.appendChild(el("div","rq-text", rtext));
     q.onclick=function(){ scrollToMsg(m.reply.id); };
     return q;
+  }
+
+  function buildMsgActions(m){
+    var acts = el("div","m-actions");
+    var rbtn = el("button","m-act-btn","↩"); rbtn.type="button"; rbtn.title=t('reply_btn'); rbtn.setAttribute("aria-label",t('reply_btn'));
+    rbtn.onclick=function(e){ e.stopPropagation(); setReply(m); };
+    acts.appendChild(rbtn);
+    if(canDelete()){
+      var xbtn = el("button","m-act-btn danger","×"); xbtn.type="button"; xbtn.title=t('del_msg'); xbtn.setAttribute("aria-label",t('del_msg'));
+      xbtn.onclick=function(e){ e.stopPropagation(); deleteMessage(m); };
+      acts.appendChild(xbtn);
+    }
+    return acts;
   }
 
   function chan(){ return CH.filter(function(c){return c.id===cur})[0]; }
@@ -1057,6 +1049,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         ib.onclick=function(){ openImage(m.image); }; ib.appendChild(im); b.appendChild(ib);
       }
       row.appendChild(a); row.appendChild(b);
+      row.appendChild(buildMsgActions(m));
       box.appendChild(row);
     });
     if(force||near) box.scrollTop=box.scrollHeight;
@@ -1101,6 +1094,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       b.appendChild(h);
       var p=el("p"); renderTextWithMentions(p, m.text); b.appendChild(p);
       row.appendChild(a); row.appendChild(b);
+      row.appendChild(buildMsgActions(m));
       box.appendChild(row);
     });
     box.scrollTop=box.scrollHeight;
@@ -1355,10 +1349,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     var inp=$("input");
     var v=inp.value;
     var m = v.match(/(^|\s)@([A-Za-zА-Яа-яЁё0-9_.-]*)$/);
-    if(m){
-      var prefix = v.slice(0, v.length - m[0].length);
-      v = prefix + (m[1]||" ") + "@"+name+" ";
-    } else { v = v + "@"+name+" "; }
+    if(m){ var prefix = v.slice(0, v.length - m[0].length); v = prefix + (m[1]||" ") + "@"+name+" "; }
+    else { v = v + "@"+name+" "; }
     inp.value = v;
     closeMentionDrop();
     inp.focus();
