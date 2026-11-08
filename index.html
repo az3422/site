@@ -79,6 +79,8 @@ button.ava:hover{background-color:var(--dim)}
 .st::after{content:"";position:absolute;right:-3px;bottom:-3px;width:.85rem;height:.85rem;border-radius:50%;background:#808080;border:2px solid var(--bg)}
 .st.on::after{background:#23c552}
 .memx,.membtn{display:none}
+.adm{color:#ff4d4d}
+.adm .bdg{color:var(--fg)}
 .bdg{display:inline-block;border:2px solid var(--fg);border-radius:999px;padding:0 .45rem;font-size:.7rem;line-height:1.35;margin-left:.4rem;font-weight:500}
 .m .b{flex:1}
 .delmsg{margin-left:auto;align-self:flex-start;opacity:.5}
@@ -296,12 +298,11 @@ button.ava:hover{background-color:var(--dim)}
     var n=list.filter(function(m){return m.on}).length;
     $("memTitle").textContent="В сети: "+n+" из "+list.length;
     ul.innerHTML="";
-    list.forEach(function(m){
+    function row(m){
       var li=el("li",m.on?"on":"off"), b=el("button"); b.type="button";
       b.setAttribute("aria-label",m.name+(isAdmin(m.key)?", админ":"")+", "+(m.on?"в сети":"не в сети"));
       var st=el("span","st"+(m.on?" on":"")), a=el("span","ava s"); paint(a,m.acc,m.name); st.appendChild(a);
-      var t=el("span","t"), nl=el("span","nline"); nl.appendChild(el("span","nmx",m.name));
-      if(isAdmin(m.key)) nl.appendChild(el("span","bdg","админ"));
+      var t=el("span","t"), nl=el("span","nline"); nl.appendChild(el("span","nmx"+(isAdmin(m.key)?" adm":""),m.name));
       t.appendChild(nl); t.appendChild(el("small",null,m.on?"в сети":"не в сети"));
       b.appendChild(st); b.appendChild(t);
       b.onclick=function(){ app.classList.remove("showmem"); openProfile(m.key,m.name); };
@@ -316,7 +317,15 @@ button.ava:hover{background-color:var(--dim)}
         };
         li.appendChild(bb);
       }
-      ul.appendChild(li);
+      return li;
+    }
+    var ga=list.filter(function(m){return m.on&&isAdmin(m.key)});
+    var go=list.filter(function(m){return m.on&&!isAdmin(m.key)});
+    var gf=list.filter(function(m){return !m.on});
+    [["Админы",ga],["Участники в сети",go],["Не в сети",gf]].forEach(function(g){
+      if(!g[1].length) return;
+      ul.appendChild(el("li","hd",g[0]+" — "+g[1].length));
+      g[1].forEach(function(m){ ul.appendChild(row(m)); });
     });
     if(adm){
       var bk=Object.keys(bans);
@@ -456,7 +465,7 @@ button.ava:hover{background-color:var(--dim)}
       var b=el("div","b"), h=el("div","h"), n=el("button","nm",name); n.type="button";
       n.onclick=function(){ openProfile(m.by,name); };
       h.appendChild(n);
-      if(isAdmin(m.by)) h.appendChild(el("span","bdg","админ"));
+      if(isAdmin(m.by)){ n.classList.add("adm"); n.setAttribute("aria-label",name+", админ"); }
       h.appendChild(el("time",null,new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
       b.appendChild(h); b.appendChild(el("p",null,m.text)); row.appendChild(a); row.appendChild(b);
       if(fbReady&&amAdmin()&&m.id){
@@ -656,7 +665,7 @@ button.ava:hover{background-color:var(--dim)}
           var li=el("li"), a=el("span","ava s"); paint(a,u.data,u.data.name);
           var nm=u.data.name||u.key, isA=!!rl[u.key]&&rl[u.key].role==="admin", isB=!!bn[u.key];
           var nl=el("span","n",nm);
-          if(isA) nl.appendChild(el("span","bdg","админ"));
+          if(isA) nl.classList.add("adm");
           if(isB) nl.appendChild(el("span","bdg","бан"));
           var fail=function(e){ $("adCount").textContent="Не удалось: "+e.message; };
           var acts=el("div","acts");
