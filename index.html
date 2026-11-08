@@ -87,20 +87,16 @@ button.ava:hover{background-color:var(--dim)}
 .row{display:flex;gap:.6rem;margin-top:.5rem}
 .row .btn{flex:1}
 
-/* Info modal */
 .info-row{display:flex;align-items:flex-start;gap:.7rem;padding:.6rem 0;border-bottom:1px dashed rgba(255,255,255,.1)}
 .info-row:last-child{border-bottom:0}
 .info-row .info-text{flex:1;min-width:0;font-size:.88rem;line-height:1.4;opacity:.9}
-.info-row .info-text b{display:block;margin-bottom:.15rem;font-weight:500;opacity:.75;font-size:.82rem}
 .info-section{margin-top:1rem}
 .info-section h3{font-family:var(--display);font-weight:500;font-size:1rem;margin:0 0 .5rem;padding-top:.8rem;border-top:2px solid var(--fg)}
 .info-section:first-of-type h3{border-top:0;padding-top:0}
-
 .role-badge{display:inline-block;padding:.15rem .6rem;border:2px solid;border-radius:999px;font-weight:600;font-size:.75rem;letter-spacing:.02em;white-space:nowrap;flex:none;font-family:var(--display);line-height:1.35}
 .role-user{color:#fff;border-color:#fff;background:rgba(255,255,255,.06)}
 .role-mod{color:transparent;-webkit-text-fill-color:transparent;-webkit-background-clip:text;background-clip:text;background-size:300% auto;animation:shimmer 3.2s linear infinite;background-image:linear-gradient(90deg,#2f7bff,#a8ccff,#2f7bff,#a8ccff,#2f7bff);border-color:#2f7bff}
 .role-admin{color:transparent;-webkit-text-fill-color:transparent;-webkit-background-clip:text;background-clip:text;background-size:300% auto;animation:shimmer 3.2s linear infinite;background-image:linear-gradient(90deg,#ff3b3b,#ffb0b0,#ff3b3b,#ffb0b0,#ff3b3b);border-color:#ff3b3b}
-
 .ping-badge{display:inline-block;padding:.15rem .55rem;border-radius:.4rem;font-weight:600;font-size:.82rem;white-space:nowrap;flex:none;font-family:var(--text)}
 .ping-everyone{color:#fbbf24;background:rgba(251,191,36,.18)}
 .ping-user{color:#c084fc;background:rgba(168,85,247,.18)}
@@ -206,6 +202,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .m-act-btn:hover{background:var(--fg);color:var(--bg)}
 .m-act-btn.danger{border-color:#ff4d4d;color:#ff4d4d}
 .m-act-btn.danger:hover{background:#ff4d4d;color:#fff;border-color:#ff4d4d}
+.m-act-btn.emoji{font-size:1rem;font-family:var(--text)}
 .empty{margin:2rem auto;text-align:center;opacity:.7}
 @keyframes msgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .fcard{border:2px solid var(--fg);border-radius:1rem;padding:.9rem 1rem;margin:0 0 .8rem;display:flex;flex-direction:column;gap:.5rem;transition:background .15s,transform .15s}
@@ -245,6 +242,26 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .ctxmenu button.danger{color:#ff4d4d}
 .ctxmenu button.danger:hover{background:#ff4d4d;color:#fff}
 .ctxmenu .ico{font-size:1.1rem;width:1.4rem;display:inline-grid;place-items:center}
+
+/* Реакции */
+.reactions{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.4rem}
+.reaction{display:inline-flex;align-items:center;gap:.28rem;padding:.15rem .55rem;border:2px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(255,255,255,.05);color:var(--fg);font-size:.9rem;cursor:pointer;transition:background .15s,border-color .15s,transform .12s;line-height:1.3}
+.reaction:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.4);transform:translateY(-1px)}
+.reaction.mine{background:rgba(168,85,247,.2);border-color:#a855f7;color:#e9d5ff}
+.reaction.mine:hover{background:rgba(168,85,247,.32)}
+.reaction.popular{border-color:rgba(251,191,36,.5)}
+.reaction.popular.mine{background:rgba(251,191,36,.22);border-color:#fbbf24;color:#fde68a}
+.r-count{font-size:.72rem;opacity:.85;font-weight:600}
+
+/* Пикер эмодзи */
+.emoji-picker{position:fixed;z-index:40;background:#141414;border:2px solid var(--fg);border-radius:.8rem;padding:.55rem;display:flex;flex-direction:column;gap:.35rem;box-shadow:0 12px 40px rgba(0,0,0,.85);animation:ctxIn .12s ease-out;max-width:min(280px,90vw)}
+.ep-label{font-size:.7rem;opacity:.6;font-weight:500;padding:0 .35rem;letter-spacing:.02em}
+.ep-label:not(:first-child){margin-top:.15rem}
+.ep-row{display:grid;grid-template-columns:repeat(6,1fr);gap:.2rem}
+.ep-btn{width:2.15rem;height:2.15rem;border:none;background:transparent;border-radius:.5rem;font-size:1.35rem;cursor:pointer;display:grid;place-items:center;transition:background .15s,transform .12s;padding:0;line-height:1}
+.ep-btn:hover{background:rgba(255,255,255,.12);transform:scale(1.15)}
+.ep-btn.popular{background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4)}
+.ep-btn.popular:hover{background:rgba(251,191,36,.24)}
 
 .frow{display:flex;align-items:center;gap:.5rem;padding:.5rem 1.25rem;border-top:2px solid var(--fg)}
 .frow span{font-weight:500;font-size:.9rem;flex:none;opacity:.85}
@@ -404,6 +421,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var MUTE_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var FORUM_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:middle;margin-right:.4rem" aria-hidden="true"><path d="M3 4h18v2H3V4zm0 5h18v2H3V9zm0 5h18v2H3v-2z"/></svg>';
+  var EMOJIS = ["😂","🤣","🤡","😈","👿","🤬","😡","👹","👺","👍","👎","🐟"];
+  var POPULAR_EMOJI = "🐟";
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="", swapUntil=0, loadedCh={};
   var unreadCh={}, lastSeenCh={}, unsubAll={}, firstSnapCh={};
   var postCommentsSub=null;
@@ -480,25 +499,17 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       msg_not_found:"Сообщение не найдено",
       everyone_forbidden:"Только модераторы и админы могут использовать @everyone",
       everyone_hint:"Все",
-      info_title:"Информация",
-      info_roles_title:"Роли",
-      info_pings_title:"Пинги",
-      info_highlights_title:"Подсветка каналов",
-      info_role_user:"Пользователь",
-      info_role_user_desc:"Пишет в каналах, отправляет фото, редактирует профиль, отвечает на сообщения и использует @упоминания.",
-      info_role_mod:"Модератор",
-      info_role_mod_desc:"Всё как у пользователя + удаление сообщений, мут, бан и пинг @everyone.",
-      info_role_admin:"Админ",
-      info_role_admin_desc:"Всё как у модератора + управление ролями, удаление аккаунтов, закрытие и удаление личных диалогов.",
+      info_title:"Информация",info_roles_title:"Роли",info_pings_title:"Пинги",info_highlights_title:"Подсветка каналов",
+      info_role_user:"Пользователь",info_role_user_desc:"Пишет в каналах, отправляет фото, редактирует профиль, отвечает на сообщения и использует @упоминания.",
+      info_role_mod:"Модератор",info_role_mod_desc:"Всё как у пользователя + удаление сообщений, мут, бан и пинг @everyone.",
+      info_role_admin:"Админ",info_role_admin_desc:"Всё как у модератора + управление ролями, удаление аккаунтов, закрытие и удаление личных диалогов.",
       info_ping_everyone_desc:"Упоминает всех участников. Могут писать только модераторы и админы.",
       info_ping_user_desc:"Упоминает конкретного пользователя по нику. Доступен всем.",
       info_ping_msg_desc:"Обычное сообщение без пинга.",
-      info_hl_white:"Белая",
-      info_hl_white_desc:"В канале появилось новое сообщение.",
-      info_hl_purple:"Фиолетовая",
-      info_hl_purple_desc:"Тебя упомянули через @ник.",
-      info_hl_yellow:"Жёлтая",
-      info_hl_yellow_desc:"Кто-то использовал @everyone."
+      info_hl_white:"Белая",info_hl_white_desc:"В канале появилось новое сообщение.",
+      info_hl_purple:"Фиолетовая",info_hl_purple_desc:"Тебя упомянули через @ник.",
+      info_hl_yellow:"Жёлтая",info_hl_yellow_desc:"Кто-то использовал @everyone.",
+      react_btn:"Реакция",popular:"Популярное",reactions:"Реакции"
     },
     en: {
       intro:"Sign in or create an account.",tab_in:"Sign in",tab_up:"Sign up",
@@ -567,25 +578,17 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       msg_not_found:"Message not found",
       everyone_forbidden:"Only moderators and admins can use @everyone",
       everyone_hint:"Everyone",
-      info_title:"Information",
-      info_roles_title:"Roles",
-      info_pings_title:"Pings",
-      info_highlights_title:"Channel highlights",
-      info_role_user:"User",
-      info_role_user_desc:"Posts in channels, sends photos, edits profile, replies to messages and uses @mentions.",
-      info_role_mod:"Moderator",
-      info_role_mod_desc:"Same as user + deletes messages, mutes, bans and can ping @everyone.",
-      info_role_admin:"Admin",
-      info_role_admin_desc:"Same as moderator + manages roles, deletes accounts, closes and deletes direct chats.",
+      info_title:"Information",info_roles_title:"Roles",info_pings_title:"Pings",info_highlights_title:"Channel highlights",
+      info_role_user:"User",info_role_user_desc:"Posts in channels, sends photos, edits profile, replies to messages and uses @mentions.",
+      info_role_mod:"Moderator",info_role_mod_desc:"Same as user + deletes messages, mutes, bans and can ping @everyone.",
+      info_role_admin:"Admin",info_role_admin_desc:"Same as moderator + manages roles, deletes accounts, closes and deletes direct chats.",
       info_ping_everyone_desc:"Mentions all members. Only moderators and admins can use.",
       info_ping_user_desc:"Mentions a specific user by nickname. Available to everyone.",
       info_ping_msg_desc:"Regular message without a ping.",
-      info_hl_white:"White",
-      info_hl_white_desc:"A new message appeared in the channel.",
-      info_hl_purple:"Purple",
-      info_hl_purple_desc:"Someone mentioned you via @nickname.",
-      info_hl_yellow:"Yellow",
-      info_hl_yellow_desc:"Someone used @everyone."
+      info_hl_white:"White",info_hl_white_desc:"A new message appeared in the channel.",
+      info_hl_purple:"Purple",info_hl_purple_desc:"Someone mentioned you via @nickname.",
+      info_hl_yellow:"Yellow",info_hl_yellow_desc:"Someone used @everyone.",
+      react_btn:"React",popular:"Popular",reactions:"Reactions"
     }
   };
   var lang;
@@ -659,7 +662,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         var arr=[];
         snap.forEach(function(d){
           var x=d.data();
-          arr.push({id:d.id,by:x.by,name:x.name,title:x.title||"",text:x.text,image:x.image||"",commentsEnabled:x.commentsEnabled,commentsCount:x.commentsCount||0,reply:x.reply||null,t:x.createdAt?x.createdAt.toDate().getTime():Date.now()});
+          arr.push({id:d.id,by:x.by,name:x.name,title:x.title||"",text:x.text,image:x.image||"",commentsEnabled:x.commentsEnabled,commentsCount:x.commentsCount||0,reply:x.reply||null,reactions:x.reactions||{},t:x.createdAt?x.createdAt.toDate().getTime():Date.now()});
         });
         arr.reverse();
         loadedCh[channelId]=true;
@@ -671,10 +674,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function setUnread(id, level){
     var ranks = {msg:1, mention:2, everyone:3};
     var prev = unreadCh[id];
-    if(!prev || ranks[level] > (ranks[prev]||0)){
-      unreadCh[id] = level;
-      renderList();
-    }
+    if(!prev || ranks[level] > (ranks[prev]||0)){ unreadCh[id] = level; renderList(); }
   }
   function detectMentionLevel(text){
     if(!text) return 'msg';
@@ -698,10 +698,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
           if(!latest) return;
           if(firstSnapCh[c.id]){ firstSnapCh[c.id]=false; lastSeenCh[c.id]=latest.t; return; }
           if(c.id===cur){ lastSeenCh[c.id]=latest.t; delete unreadCh[c.id]; return; }
-          if(latest.by!==me.key && latest.t>(lastSeenCh[c.id]||0)){
-            var lvl = detectMentionLevel(latest.text);
-            setUnread(c.id, lvl);
-          }
+          if(latest.by!==me.key && latest.t>(lastSeenCh[c.id]||0)){ setUnread(c.id, detectMentionLevel(latest.text)); }
         },function(e){ console.error("watch:"+c.id,e); });
     });
   }
@@ -730,7 +727,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         var arr=[];
         snap.forEach(function(d){
           var x=d.data();
-          arr.push({id:d.id,by:x.by,name:x.name,text:x.text,reply:x.reply||null,t:x.t&&x.t.toMillis?x.t.toMillis():Date.now()});
+          arr.push({id:d.id,by:x.by,name:x.name,text:x.text,reply:x.reply||null,reactions:x.reactions||{},t:x.t&&x.t.toMillis?x.t.toMillis():Date.now()});
         });
         dmData=arr;
         if(dmUser===userKey) renderDM();
@@ -918,13 +915,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     while((m = re.exec(text)) !== null){
       if(m.index>last) container.appendChild(document.createTextNode(text.slice(last, m.index)));
       var sp = document.createElement("span");
-      if(m[1].toLowerCase() === "everyone"){
-        sp.className = "mention everyone-mention";
-        sp.textContent = "@everyone";
-      } else {
-        sp.className = "mention";
-        sp.textContent = "@"+m[1];
-      }
+      if(m[1].toLowerCase() === "everyone"){ sp.className = "mention everyone-mention"; sp.textContent = "@everyone"; }
+      else { sp.className = "mention"; sp.textContent = "@"+m[1]; }
       container.appendChild(sp);
       last = m.index + m[0].length;
     }
@@ -959,6 +951,93 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     setTimeout(function(){ n.classList.remove("highlight"); }, 1400);
   }
 
+  // ===== Реакции =====
+  function toggleReaction(m, emoji){
+    if(!me||!fbReady) return;
+    var coll = dmUser ? fbdb.collection("dms").doc(dmUser).collection("messages") : fbdb.collection("channels").doc(cur).collection("messages");
+    var ref = coll.doc(m.id);
+    fbdb.runTransaction(function(tx){
+      return tx.get(ref).then(function(doc){
+        if(!doc.exists) throw new Error("no doc");
+        var data = doc.data() || {};
+        var reactions = data.reactions || {};
+        var users = (reactions[emoji] || []).slice();
+        var idx = users.indexOf(me.key);
+        if(idx > -1) users.splice(idx, 1);
+        else users.push(me.key);
+        var newReactions = {};
+        Object.keys(reactions).forEach(function(k){ if(k!==emoji) newReactions[k] = reactions[k]; });
+        if(users.length > 0) newReactions[emoji] = users;
+        tx.update(ref, {reactions: newReactions});
+      });
+    }).catch(function(e){ console.error("reaction:",e); });
+  }
+
+  function renderReactionsRow(m){
+    if(!m.reactions) return null;
+    var keys = Object.keys(m.reactions).filter(function(k){ return m.reactions[k] && m.reactions[k].length > 0; });
+    if(!keys.length) return null;
+    var wrap = el("div","reactions");
+    keys.forEach(function(emoji){
+      var users = m.reactions[emoji];
+      var mine = me && users.indexOf(me.key) > -1;
+      var b = el("button","reaction" + (mine?" mine":"") + (emoji===POPULAR_EMOJI?" popular":""));
+      b.type = "button";
+      b.appendChild(document.createTextNode(emoji));
+      b.appendChild(el("span","r-count", String(users.length)));
+      b.title = users.join(", ");
+      b.onclick = function(e){ e.stopPropagation(); toggleReaction(m, emoji); };
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+
+  function closeEmojiPicker(){
+    var p = document.getElementById("emojiPicker");
+    if(p) p.remove();
+  }
+  function openEmojiPicker(m, anchorEl){
+    closeEmojiPicker();
+    var picker = el("div","emoji-picker");
+    picker.id = "emojiPicker";
+
+    var popLabel = el("div","ep-label", t('popular'));
+    var popRow = el("div","ep-row");
+    EMOJIS.filter(function(e){return e===POPULAR_EMOJI}).forEach(function(e){
+      var b = el("button","ep-btn popular", e); b.type="button";
+      b.onclick=function(ev){ ev.stopPropagation(); toggleReaction(m,e); closeEmojiPicker(); };
+      popRow.appendChild(b);
+    });
+    picker.appendChild(popLabel); picker.appendChild(popRow);
+
+    var restLabel = el("div","ep-label", t('reactions'));
+    var restRow = el("div","ep-row");
+    EMOJIS.filter(function(e){return e!==POPULAR_EMOJI}).forEach(function(e){
+      var b = el("button","ep-btn", e); b.type="button";
+      b.onclick=function(ev){ ev.stopPropagation(); toggleReaction(m,e); closeEmojiPicker(); };
+      restRow.appendChild(b);
+    });
+    picker.appendChild(restLabel); picker.appendChild(restRow);
+
+    document.body.appendChild(picker);
+    var r = anchorEl.getBoundingClientRect();
+    var pw = picker.offsetWidth, ph = picker.offsetHeight;
+    var x = r.right - pw;
+    var y = r.bottom + 6;
+    if(y + ph > window.innerHeight - 8) y = r.top - ph - 6;
+    if(x < 8) x = 8;
+    if(x + pw > window.innerWidth - 8) x = window.innerWidth - pw - 8;
+    if(y < 8) y = 8;
+    picker.style.left = x + "px";
+    picker.style.top = y + "px";
+  }
+  document.addEventListener("click", function(e){
+    var p = document.getElementById("emojiPicker");
+    if(p && !p.contains(e.target)) closeEmojiPicker();
+  });
+  $("msgs").addEventListener("scroll", closeEmojiPicker);
+
+  // ===== Контекстное меню =====
   function closeCtxMenu(){ ctxMsg=null; var menu=$("ctxMenu"); menu.hidden=true; menu.innerHTML=""; }
   function openCtxMenu(x, y, m){
     if(!m || !m.id) return;
@@ -969,6 +1048,11 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     bReply.appendChild(document.createTextNode(t('reply_btn')));
     bReply.onclick=function(e){ e.stopPropagation(); var target=ctxMsg; closeCtxMenu(); setReply(target); };
     menu.appendChild(bReply);
+    var bReact = el("button"); bReact.type="button";
+    bReact.appendChild(el("span","ico","😊"));
+    bReact.appendChild(document.createTextNode(t('react_btn')));
+    bReact.onclick=function(e){ e.stopPropagation(); var target=ctxMsg; closeCtxMenu(); openEmojiPicker(target, bReact); };
+    menu.appendChild(bReact);
     if(canDelete()){
       var bDel=el("button","danger"); bDel.type="button";
       bDel.appendChild(el("span","ico","×"));
@@ -984,7 +1068,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     menu.style.left=mx+"px"; menu.style.top=my+"px";
   }
   document.addEventListener("click", function(e){ if(!$("ctxMenu").hidden && !$("ctxMenu").contains(e.target)) closeCtxMenu(); });
-  document.addEventListener("keydown", function(e){ if(e.key==="Escape" && !$("ctxMenu").hidden) closeCtxMenu(); });
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ if(!$("ctxMenu").hidden) closeCtxMenu(); if(!$("emojiPicker")==null) closeEmojiPicker(); } });
 
   function deleteMessage(m){
     if(!m || !m.id) return;
@@ -1038,6 +1122,9 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     var rbtn = el("button","m-act-btn","↩"); rbtn.type="button"; rbtn.title=t('reply_btn'); rbtn.setAttribute("aria-label",t('reply_btn'));
     rbtn.onclick=function(e){ e.stopPropagation(); setReply(m); };
     acts.appendChild(rbtn);
+    var ebtn = el("button","m-act-btn emoji","😊"); ebtn.type="button"; ebtn.title=t('react_btn'); ebtn.setAttribute("aria-label",t('react_btn'));
+    ebtn.onclick=function(e){ e.stopPropagation(); openEmojiPicker(m, ebtn); };
+    acts.appendChild(ebtn);
     if(canDelete()){
       var xbtn = el("button","m-act-btn danger","×"); xbtn.type="button"; xbtn.title=t('del_msg'); xbtn.setAttribute("aria-label",t('del_msg'));
       xbtn.onclick=function(e){ e.stopPropagation(); deleteMessage(m); };
@@ -1060,7 +1147,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         if(c.forum){ b.innerHTML=FORUM_SVG; b.appendChild(document.createTextNode(c.name)); }
         else { b.textContent="# "+c.name; }
         b.onclick=function(){
-          closeCtxMenu();
+          closeCtxMenu(); closeEmojiPicker();
           dmUser=null; if(unsubDM){ unsubDM(); unsubDM=null; } dmData=[]; replyTo=null; updateReplyPreview();
           $("dmLockBtn").hidden=true; $("dmDelBtn").hidden=true; $("memBtn").hidden=false;
           cur=c.id; delete unreadCh[c.id]; lastSeenCh[c.id]=Date.now();
@@ -1091,7 +1178,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       var acc=getAcc(k); var nm=(acc&&acc.name)||k;
       var label = amAdmin() ? nm : t('admin_word_short');
       b.textContent = label + (d && d.closed ? " 🔒" : "");
-      b.onclick=function(){ closeCtxMenu(); openDM(k); };
+      b.onclick=function(){ closeCtxMenu(); closeEmojiPicker(); openDM(k); };
       li.appendChild(b); dml.appendChild(li);
     });
   }
@@ -1137,6 +1224,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         im.src=m.image; im.alt=t('photo'); im.onload=function(){ if(stick) box.scrollTop=box.scrollHeight; };
         ib.onclick=function(){ openImage(m.image); }; ib.appendChild(im); b.appendChild(ib);
       }
+      var rrow = renderReactionsRow(m); if(rrow) b.appendChild(rrow);
       row.appendChild(a); row.appendChild(b);
       row.appendChild(buildMsgActions(m));
       box.appendChild(row);
@@ -1180,6 +1268,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       h.appendChild(el("time",null,new Date(m.t).toLocaleTimeString(lang==='ru'?"ru-RU":"en-GB",{hour:"2-digit",minute:"2-digit"})));
       b.appendChild(h);
       var p=el("p"); renderTextWithMentions(p, m.text); b.appendChild(p);
+      var rrow = renderReactionsRow(m); if(rrow) b.appendChild(rrow);
       row.appendChild(a); row.appendChild(b);
       row.appendChild(buildMsgActions(m));
       box.appendChild(row);
@@ -1517,12 +1606,12 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(data[cur].length>500) data[cur]=data[cur].slice(-500);
     wr(SRV,data); $("input").value=""; if($("titleInput")) $("titleInput").value=""; clearReply(); renderMsgs(true);
   };
-  $("back").onclick=function(){ closeCtxMenu(); if(dmUser){ closeDM(); app.classList.remove("open"); return; } app.classList.remove("open"); };
+  $("back").onclick=function(){ closeCtxMenu(); closeEmojiPicker(); if(dmUser){ closeDM(); app.classList.remove("open"); return; } app.classList.remove("open"); };
   $("memBtn").onclick=function(){ app.classList.add("showmem"); };
   $("memX").onclick=function(){ app.classList.remove("showmem"); };
   $("clearBtn").onclick=function(){ if(dmUser) return; clearChannel(cur); };
   $("out").onclick=function(){
-    closeCtxMenu();
+    closeCtxMenu(); closeEmojiPicker();
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
     if(unsubDMs){ unsubDMs(); unsubDMs=null; }
@@ -1845,64 +1934,43 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   $("tabUp").addEventListener("click",function(){ setMode("up"); });
   $("tabAd").addEventListener("click",function(){ setMode("ad"); });
 
-  // ===== INFO MODAL =====
   function renderInfo(){
     var box=$("icard"); box.innerHTML="";
     box.appendChild(el("h2",null,t('info_title')));
-
     var secRoles = el("div","info-section");
     secRoles.appendChild(el("h3",null,t('info_roles_title')));
-    [{cls:"role-user", label:t('info_role_user'), desc:t('info_role_user_desc')},
-     {cls:"role-mod", label:t('info_role_mod'), desc:t('info_role_mod_desc')},
-     {cls:"role-admin", label:t('info_role_admin'), desc:t('info_role_admin_desc')}
-    ].forEach(function(r){
-      var row=el("div","info-row");
-      row.appendChild(el("span","role-badge "+r.cls, r.label));
-      var txt=el("div","info-text");
-      txt.appendChild(document.createTextNode(r.desc));
-      row.appendChild(txt);
+    [{cls:"role-user",label:t('info_role_user'),desc:t('info_role_user_desc')},
+     {cls:"role-mod",label:t('info_role_mod'),desc:t('info_role_mod_desc')},
+     {cls:"role-admin",label:t('info_role_admin'),desc:t('info_role_admin_desc')}].forEach(function(r){
+      var row=el("div","info-row"); row.appendChild(el("span","role-badge "+r.cls, r.label));
+      var txt=el("div","info-text"); txt.appendChild(document.createTextNode(r.desc)); row.appendChild(txt);
       secRoles.appendChild(row);
     });
     box.appendChild(secRoles);
-
     var secPings = el("div","info-section");
     secPings.appendChild(el("h3",null,t('info_pings_title')));
-    [{cls:"ping-everyone", label:"@everyone", desc:t('info_ping_everyone_desc')},
-     {cls:"ping-user", label:"@ник", desc:t('info_ping_user_desc')},
-     {cls:"ping-msg", label:"#", desc:t('info_ping_msg_desc')}
-    ].forEach(function(r){
-      var row=el("div","info-row");
-      row.appendChild(el("span","ping-badge "+r.cls, r.label));
-      var txt=el("div","info-text");
-      txt.appendChild(document.createTextNode(r.desc));
-      row.appendChild(txt);
+    [{cls:"ping-everyone",label:"@everyone",desc:t('info_ping_everyone_desc')},
+     {cls:"ping-user",label:"@ник",desc:t('info_ping_user_desc')},
+     {cls:"ping-msg",label:"#",desc:t('info_ping_msg_desc')}].forEach(function(r){
+      var row=el("div","info-row"); row.appendChild(el("span","ping-badge "+r.cls, r.label));
+      var txt=el("div","info-text"); txt.appendChild(document.createTextNode(r.desc)); row.appendChild(txt);
       secPings.appendChild(row);
     });
     box.appendChild(secPings);
-
     var secHl = el("div","info-section");
     secHl.appendChild(el("h3",null,t('info_highlights_title')));
-    [{cls:"white", label:t('info_hl_white'), desc:t('info_hl_white_desc')},
-     {cls:"purple", label:t('info_hl_purple'), desc:t('info_hl_purple_desc')},
-     {cls:"yellow", label:t('info_hl_yellow'), desc:t('info_hl_yellow_desc')}
-    ].forEach(function(r){
-      var row=el("div","info-row");
-      row.appendChild(el("span","ping-hl "+r.cls));
-      var txt=el("div","info-text");
-      txt.appendChild(document.createTextNode(r.label+" — "+r.desc));
-      row.appendChild(txt);
+    [{cls:"white",label:t('info_hl_white'),desc:t('info_hl_white_desc')},
+     {cls:"purple",label:t('info_hl_purple'),desc:t('info_hl_purple_desc')},
+     {cls:"yellow",label:t('info_hl_yellow'),desc:t('info_hl_yellow_desc')}].forEach(function(r){
+      var row=el("div","info-row"); row.appendChild(el("span","ping-hl "+r.cls));
+      var txt=el("div","info-text"); txt.appendChild(document.createTextNode(r.label+" — "+r.desc)); row.appendChild(txt);
       secHl.appendChild(row);
     });
     box.appendChild(secHl);
-
-    var c=el("button","btn ghost full",t('close'));
-    c.type="button"; c.style.marginTop="1rem"; c.onclick=closeInfo;
+    var c=el("button","btn ghost full",t('close')); c.type="button"; c.style.marginTop="1rem"; c.onclick=closeInfo;
     box.appendChild(c);
   }
-  function openInfo(){
-    renderInfo();
-    $("infoModal").hidden=false;
-  }
+  function openInfo(){ renderInfo(); $("infoModal").hidden=false; }
   function closeInfo(){ $("infoModal").hidden=true; }
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeInfo(); });
   $("infoModal").addEventListener("click",function(e){ if(e.target===$("infoModal")) closeInfo(); });
