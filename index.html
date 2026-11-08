@@ -68,6 +68,11 @@ button.ava:hover{background-color:var(--dim)}
 
 .pf{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.6rem;margin-bottom:1rem}
 .pf p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.pbanner{margin:-1.75rem -1.75rem 0;height:7.5rem;background-size:cover;background-position:center;border-radius:calc(1.1rem - 2px) calc(1.1rem - 2px) 0 0;border-bottom:2px solid var(--fg)}
+.pbanner.none{height:3.5rem;display:grid;place-items:center;font-size:.85rem;opacity:.7;border-bottom:2px dashed var(--fg)}
+.pf.withb{margin-top:-3.4rem}
+.pf.withb .ava.l{border-width:3px;box-shadow:0 0 0 3px var(--bg)}
+.bnote{font-size:.85rem;opacity:.75;margin:.8rem 0 .4rem}
 .glyphs{display:flex;flex-wrap:wrap;gap:.4rem;margin:.4rem 0 1rem}
 .g{width:2.4rem;height:2.4rem;border-radius:50%;border:2px solid var(--fg);background:none;font-size:1.1rem}
 .g:hover,.g[aria-pressed=true]{background:var(--fg);color:var(--bg)}
@@ -252,7 +257,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var READONLY={"announcements":1,"scripts":1};
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var FORUM_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:middle;margin-right:.4rem" aria-hidden="true"><path d="M3 4h18v2H3V4zm0 5h18v2H3V9zm0 5h18v2H3v-2z"/></svg>';
-  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0;
+  var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={};
 
   
   var firebaseConfig = {
@@ -720,13 +725,43 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   }
 
   /* ===== ФУНКЦИЯ ИЗМЕНЕНА: добавлен fallback через get() ===== */
+  function loadBanner(key,cb){
+    if(!fbReady||!roleOf(key)){ cb(""); return; }
+    if(key in bannerCache){ cb(bannerCache[key]); return; }
+    fbdb.collection("banners").doc(key).get().then(function(d){
+      var v=(d.exists&&okImg(d.data().image))?d.data().image:"";
+      bannerCache[key]=v; cb(v);
+    }).catch(function(e){ console.error("banner:",e); cb(""); });
+  }
+  function setBannerEl(bn,pf,img){
+    bn.className="pbanner"+(img?"":" none"); bn.style.backgroundImage=img?"url("+img+")":""; bn.textContent=img?"":"Нет баннера";
+    pf.classList.toggle("withb",!!img);
+  }
+  function coverImage(file,w,h,maxLen,cb){
+    var r=new FileReader();
+    r.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        var c=document.createElement("canvas"); c.width=w; c.height=h;
+        var k=Math.max(w/img.width,h/img.height), iw=img.width*k, ih=img.height*k;
+        var g=c.getContext("2d"); g.fillStyle="#000"; g.fillRect(0,0,w,h); g.drawImage(img,(w-iw)/2,(h-ih)/2,iw,ih);
+        var q=0.8, d=c.toDataURL("image/jpeg",q);
+        while(d.length>maxLen&&q>0.35){ q-=0.1; d=c.toDataURL("image/jpeg",q); }
+        cb(d.length>maxLen?null:d);
+      };
+      img.onerror=function(){ cb(null); };
+      img.src=r.result;
+    };
+    r.onerror=function(){ cb(null); };
+    r.readAsDataURL(file);
+  }
   function adminPanel(key,name){
     var asMod=!amAdmin(), MAXMIN=7*24*60;
     var p=el("div","apanel"), mu=muteOf(key), bn=!!bans[key];
     var reopen=function(){ openProfile(key,name); }, fail=function(e){ console.error("admin:",e); };
     var ts=firebase.firestore.FieldValue.serverTimestamp;
     p.appendChild(el("h3",null,asMod?"Панель модератора":"Админ-панель"));
-    var st=(bn?"Забанен. ":"")+(mu?"В муте "+muteLabel(mu)+".":"");
+    var st=(isMod(key)?"Модератор. ":"")+(bn?"Забанен. ":"")+(mu?"В муте "+muteLabel(mu)+".":"");
     if(st) p.appendChild(el("p","st2",st));
     var msg=el("p","st2"); msg.setAttribute("role","alert"); msg.hidden=true;
     var r1=el("div","row2");
@@ -752,6 +787,12 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     }
     p.appendChild(r1); p.appendChild(msg);
     if(!asMod){
+      var r3=el("div","row2"), isM2=isMod(key), rm=el("button","sm",isM2?"Снять модератора":"Дать модератора"); rm.type="button";
+      rm.onclick=function(){
+        rm.disabled=true;
+        (isM2?fbdb.collection("roles").doc(key).delete():fbdb.collection("roles").doc(key).set({role:"mod",t:ts()})).then(reopen).catch(fail);
+      };
+      r3.appendChild(rm); p.appendChild(r3);
       var r2=el("div","row2"), sure=false, bb=el("button","sm",bn?"Разбанить":"Забанить"); bb.type="button";
       bb.onclick=function(){
         if(bn){ fbdb.collection("bans").doc(key).delete().then(reopen).catch(fail); return; }
@@ -786,18 +827,25 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 
     var acc=getAcc(key), mine=!!(me&&key===me.key&&acc), box=$("pcard");
     box.innerHTML=""; $("modal").hidden=false;
-    var pf=el("div","pf"), av=el("div","ava l"), nm=el("h2",null,acc?acc.name:name);
+    var pf=el("div","pf"), av=el("div","ava l"), nm=el("h2",null,acc?acc.name:name), pk=++profTok, bn=el("div","pbanner none");
     pf.appendChild(av); pf.appendChild(nm);
     if(!mine){
       paint(av,acc,name);
       pf.appendChild(el("p",null,acc?(acc.bio||"Описание не указано."):"Аккаунт удалён."));
       box.appendChild(pf);
+      loadBanner(key,function(img){ if(!img||pk!==profTok||$("modal").hidden) return; setBannerEl(bn,pf,img); box.insertBefore(bn,box.firstChild); });
       if(acc&&canModerate(key)) box.appendChild(adminPanel(key,name));
       var c1=el("button","btn ghost full","Закрыть"); c1.type="button"; c1.onclick=closeProfile; box.appendChild(c1);
       c1.focus(); return;
     }
     draft={avatar:acc.avatar||""};
     nm.textContent="Мой профиль"; box.appendChild(pf);
+    var staff=fbReady&&!!roleOf(me.key);
+    draft.banner=""; draft.bannerDirty=false;
+    if(staff){
+      setBannerEl(bn,pf,""); box.insertBefore(bn,box.firstChild);
+      loadBanner(me.key,function(img){ if(pk!==profTok||$("modal").hidden||draft.bannerDirty) return; draft.banner=img; setBannerEl(bn,pf,img); });
+    }
     var gb=[];
     function sync(){ paint(av,draft,acc.name); gb.forEach(function(b){ b.setAttribute("aria-pressed",String(b.textContent===draft.avatar)); }); }
     var file=el("input"); file.type="file"; file.accept="image/*"; file.hidden=true;
@@ -814,6 +862,21 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     box.appendChild(gl);
     var reset=el("button","sm","Сбросить аватарку"); reset.type="button"; reset.onclick=function(){ draft.avatar=""; sync(); };
     box.appendChild(reset);
+    if(staff){
+      box.appendChild(el("p","bnote","Баннер профиля (только для админов и модераторов):"));
+      var bfile=el("input"); bfile.type="file"; bfile.accept="image/*"; bfile.hidden=true;
+      var bup=el("button","btn ghost full","Загрузить баннер"); bup.type="button"; bup.onclick=function(){ bfile.click(); };
+      var bdel=el("button","sm","Убрать баннер"); bdel.type="button"; bdel.style.marginTop=".5rem";
+      bdel.onclick=function(){ draft.banner=""; draft.bannerDirty=true; setBannerEl(bn,pf,""); };
+      bfile.onchange=function(){
+        var f=bfile.files[0]; if(!f) return; err.textContent="";
+        coverImage(f,800,240,200000,function(d){
+          if(!d){ err.textContent="Не удалось открыть изображение."; return; }
+          draft.banner=d; draft.bannerDirty=true; setBannerEl(bn,pf,d);
+        });
+      };
+      box.appendChild(bfile); box.appendChild(bup); box.appendChild(bdel);
+    }
     var lab=el("label",null,"Описание"); lab.style.marginTop="1rem";
     var ta=el("textarea"); ta.rows=3; ta.maxLength=200; ta.value=acc.bio||""; lab.appendChild(ta);
     box.appendChild(lab); box.appendChild(err);
@@ -823,6 +886,11 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       var u=users(), bio=ta.value.trim().slice(0,200);
       if(u[me.key]){ u[me.key].avatar=draft.avatar; u[me.key].bio=bio; if(!wr(USERS,u)){ err.textContent="Не удалось сохранить: слишком большое фото."; return; } }
       fbSaveUser(me.key, { name: me.name, avatar: draft.avatar, bio: bio });
+      if(staff&&draft.bannerDirty){
+        var nb=draft.banner, bref=fbdb.collection("banners").doc(me.key);
+        bannerCache[me.key]=nb;
+        (nb?bref.set({image:nb}):bref.delete()).catch(function(e2){ console.error("banner save:",e2); });
+      }
       closeProfile(); render();
     };
     row.appendChild(save); row.appendChild(cancel); box.appendChild(row);
@@ -931,7 +999,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
               fbdb.collection("presence").doc(u.key).delete(),
               fbdb.collection("roles").doc(u.key).delete(),
               fbdb.collection("bans").doc(u.key).delete(),
-              fbdb.collection("mutes").doc(u.key).delete()
+              fbdb.collection("mutes").doc(u.key).delete(),
+              fbdb.collection("banners").doc(u.key).delete()
             ]).then(showAdmin).catch(fail);
           };
           acts.appendChild(rb); acts.appendChild(mdb); acts.appendChild(bb); acts.appendChild(b);
