@@ -235,7 +235,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var $=function(id){return document.getElementById(id)};
   var USERS="divine-net-users-v1", SESSION="divine-net-session-v1", SRV="divine-net-server-v1";
   var ADSALT="divine-admin", ADHASH="cd0159aca7bbdb576d4beec4912e52a6bbd97f1205510b3c2a03e829b1c75208";
-  var CH=[{id:"announcements",name:"announcements",sub:"Новости сервера"},{id:"general",name:"general",sub:"Общий чат"},{id:"media",name:"media",sub:"Фотографии"}];
+  var CH=[{id:"announcements",name:"announcements",sub:"Новости сервера"},{id:"scripts",name:"scripts",sub:"Скрипты"},{id:"general",name:"general",sub:"Общий чат"},{id:"media",name:"media",sub:"Фотографии"}];
+  var READONLY={"announcements":1,"scripts":1};
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0;
 
@@ -477,7 +478,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     var near=box.scrollHeight-box.scrollTop-box.clientHeight<80, stick=!!force||near;
     $("topName").textContent="# "+c.name; $("topSub").textContent=c.sub; $("input").placeholder="Написать в #"+c.name; applyComposer();
     box.innerHTML="";
-    if(!list.length) box.appendChild(el("p","empty",canWrite()?"Здесь пока тихо. Напишите первым.":(cur==="announcements"?"Здесь пока нет новостей.":"Здесь пока тихо.")));
+    if(!list.length) box.appendChild(el("p","empty",canWrite()?"Здесь пока тихо. Напишите первым.":(READONLY[cur]?"Здесь пока нет публикаций.":"Здесь пока тихо.")));
     list.forEach(function(m){
       var acc=getAcc(m.by), name=acc?acc.name:m.name, row=el("div","m");
       var a=el("button","ava"); a.type="button"; paint(a,acc,name); a.setAttribute("aria-label","Профиль: "+name);
@@ -524,19 +525,19 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     return "до "+t+(d.toDateString()!==new Date().toDateString()?" ("+d.toLocaleDateString("ru-RU")+")":"");
   }
   function canWrite(){
-    if(cur==="announcements"&&fbReady&&!amAdmin()) return false;
+    if(READONLY[cur]&&fbReady&&!amAdmin()) return false;
     if(fbReady&&me&&!amAdmin()&&muteOf(me.key)) return false;
     return true;
   }
   function lockText(){
-    if(cur==="announcements"&&fbReady&&!amAdmin()) return "Следите за новостями";
+    if(READONLY[cur]&&fbReady&&!amAdmin()) return cur==="scripts"?"Публикуют только администраторы":"Следите за новостями";
     var m=me&&muteOf(me.key); return m?"Вы в муте "+muteLabel(m):"Следите за новостями";
   }
   function clearAttach(){ pendImg=null; $("prev").hidden=true; $("prevImg").removeAttribute("src"); $("file").value=""; }
   var serrT=null;
   function sendErr(msg){ var e=$("serr"); e.textContent=msg; e.hidden=false; clearTimeout(serrT); serrT=setTimeout(function(){ e.hidden=true; },5000); }
   function applyComposer(){
-    var w=canWrite(), media=cur==="media"&&fbReady;
+    var w=canWrite(), media=(cur==="media"||cur==="scripts")&&fbReady;
     $("form").hidden=!w; $("locked").hidden=w; $("locked").textContent=lockText();
     $("clip").hidden=!media||!w;
     if(!media||!w) clearAttach();
@@ -576,7 +577,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   $("prevX").onclick=clearAttach;
   $("form").onsubmit=function(e){
     e.preventDefault();
-    var t=$("input").value.trim(), img=(cur==="media"&&fbReady)?pendImg:null;
+    var t=$("input").value.trim(), img=((cur==="media"||cur==="scripts")&&fbReady)?pendImg:null;
     if((!t&&!img)||!me||!canWrite()) return;
     if(fbReady){
       var doc={by:me.key,name:me.name,text:t.slice(0,2000),createdAt:firebase.firestore.FieldValue.serverTimestamp()};
