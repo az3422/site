@@ -141,7 +141,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .list li.unread button{position:relative}
 .list li.unread button::before{content:"";position:absolute;inset:0;padding:2px;border-radius:.6rem;background:linear-gradient(90deg,#a855f7,#e879f9,#c084fc,#e879f9,#a855f7);background-size:300% 100%;animation:shimmer 3.2s linear infinite;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
 #dmlist{max-height:40vh;flex:none;border-top:2px solid var(--fg)}
-.dm-close{opacity:.5;font-size:.85rem;margin-left:.5rem}
 .me{display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;border-top:2px solid var(--fg)}
 .mebtn{display:flex;align-items:center;gap:.6rem;flex:1;min-width:0;background:none;border:0;padding:.2rem;text-align:left;border-radius:.6rem}
 .mebtn:hover{background:var(--dim)}
@@ -371,8 +370,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         arr.reverse();
         loadedCh[channelId]=true;
         data[channelId]=arr;
-        if(cur===channelId) renderMsgs();
-      }, function(e){ console.error("messages:",e); loadedCh[channelId]=true; if(cur===channelId) renderMsgs(); });
+        if(cur===channelId && !dmUser) renderMsgs();
+      }, function(e){ console.error("messages:",e); loadedCh[channelId]=true; if(cur===channelId && !dmUser) renderMsgs(); });
   }
 
   function watchAllChannels(){
@@ -404,15 +403,25 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   }
 
   function subscribeDMs(){
-    if(!fbReady) return;
+    if(!fbReady||!me) return;
     if(unsubDMs){ unsubDMs(); unsubDMs=null; }
-    unsubDMs = fbdb.collection("dms").onSnapshot(function(snap){
-      dms={};
-      snap.forEach(function(d){ dms[d.id]=d.data(); });
-      renderList();
-      if(dmUser) renderDM();
-      applyComposer();
-    },function(e){ console.error("dms:",e); });
+    if(amAdmin()){
+      unsubDMs = fbdb.collection("dms").onSnapshot(function(snap){
+        dms={};
+        snap.forEach(function(d){ dms[d.id]=d.data(); });
+        renderList();
+        if(dmUser) renderDM();
+        applyComposer();
+      },function(e){ console.error("dms:",e); });
+    } else {
+      unsubDMs = fbdb.collection("dms").doc(me.key).onSnapshot(function(d){
+        dms={};
+        if(d.exists){ dms[d.id]=d.data(); }
+        renderList();
+        if(dmUser) renderDM();
+        applyComposer();
+      },function(e){ console.error("dm:",e); });
+    }
   }
 
   function subscribeDM(userKey){
@@ -541,7 +550,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(unsubBans){ unsubBans(); unsubBans=null; }
     unsubRoles=fbdb.collection("roles").onSnapshot(function(snap){
       var tmp={}; snap.forEach(function(d){ tmp[d.id]=d.data(); }); roles=tmp;
-      if(me){ renderMembers(); renderMsgs(); }
+      if(me){ renderMembers(); renderMsgs(); subscribeDMs(); }
     },function(e){ console.error("roles:",e); });
     if(unsubMutes){ unsubMutes(); unsubMutes=null; }
     unsubMutes=fbdb.collection("mutes").onSnapshot(function(snap){
@@ -661,7 +670,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         li.appendChild(b); ul.appendChild(li);
       });
     });
-    // ЛС
     var dml=$("dmlist"); dml.innerHTML="";
     var showSec = amAdmin() || (me && dms[me.key]);
     if(!showSec) return;
