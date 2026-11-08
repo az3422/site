@@ -329,11 +329,14 @@ button.ava:hover{background-color:var(--dim)}
     },function(){});
   }
 
-  function claimAccount(key,name,salt,h){
-    var ref=fbdb.collection("accounts").doc(key);
+  /* Имя занимается одной операцией. Имя считается занятым, если есть аккаунт ИЛИ профиль
+     (старые аккаунты, ещё не перенесённые в accounts, тоже защищены). Регистр букв не важен. */
+  function claimAccount(key,name,salt,h,ownsProfile){
+    var ref=fbdb.collection("accounts").doc(key), uref=fbdb.collection("users").doc(key);
     return fbdb.runTransaction(function(tx){
-      return tx.get(ref).then(function(d){
-        if(d.exists) return "taken";
+      return Promise.all([tx.get(ref),tx.get(uref)]).then(function(r){
+        if(r[0].exists) return "taken";
+        if(r[1].exists&&!ownsProfile) return "taken";
         tx.set(ref,{name:name,salt:salt,hash:h,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
         return "ok";
       });
@@ -650,13 +653,15 @@ button.ava:hover{background-color:var(--dim)}
       return;
     }
     /* с Firebase: аккаунты общие для всех устройств */
+    var TAKEN="Такое имя уже занято (регистр букв не важен). Если это ваш аккаунт, откройте вкладку «Вход».";
     var srvErr=function(e){ console.error("auth:",e); err.textContent="Не удалось связаться с сервером. Попробуйте позже."; };
     if(mode==="up"){
       if(pw!==$("p2").value){ err.textContent="Пароли не совпадают."; return; }
+      if(all[key]){ err.textContent=TAKEN; return; }
       var arr=new Uint8Array(8); crypto.getRandomValues(arr);
       var salt=Array.prototype.join.call(arr,"-");
       hash(pw,salt).then(function(h){ return claimAccount(key,name,salt,h); }).then(function(r){
-        if(r==="taken"){ err.textContent="Такое имя уже занято."; return; }
+        if(r==="taken"){ err.textContent=TAKEN; return; }
         fbSaveUser(key,{name:name,avatar:"",bio:""});
         return fbdb.collection("deleted").doc(key).delete().catch(function(){}).then(function(){ $("authForm").reset(); enter(name); });
       }).catch(srvErr);
@@ -676,7 +681,7 @@ button.ava:hover{background-color:var(--dim)}
       return Promise.all([hash(pw,la.salt),checkDeleted(key)]).then(function(r){
         if(r[1]){ var u=users(); delete u[key]; wr(USERS,u); err.textContent="Этот аккаунт удалён администратором."; return; }
         if(r[0]!==la.hash){ err.textContent="Неверный пароль."; return; }
-        return claimAccount(key,la.name,la.salt,la.hash).then(function(res){
+        return claimAccount(key,la.name,la.salt,la.hash,true).then(function(res){
           if(res==="taken"){ err.textContent="Неверный пароль."; return; }
           $("authForm").reset(); enter(la.name);
         });
