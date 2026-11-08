@@ -278,6 +278,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 <div class="modal" id="modal" hidden><div class="card" id="pcard"></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
 <script>
@@ -308,10 +309,19 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   try{
     if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
       firebase.initializeApp(firebaseConfig);
+      firebase.auth().signInAnonymously().catch(function(e){ console.error("anon auth:",e); });
       fbdb=firebase.firestore();
       fbReady=true;
     }
   }catch(e){ console.error("Firebase:",e); fbReady=false; }
+
+  function fbAuth(name){
+    if(!fbReady||!name) return;
+    var u=null;
+    try{ u=firebase.auth().currentUser; }catch(e){}
+    if(!u){ setTimeout(function(){ fbAuth(name); },400); return; }
+    fbdb.collection("authmap").doc(u.uid).set({name:name}).catch(function(e){ console.error("authmap:",e); });
+  }
 
   function subscribeMessages(channelId){
     if(!fbReady) return;
@@ -694,7 +704,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     me={key:name.toLowerCase(),name:name};
     try{ localStorage.setItem(SESSION,name); }catch(e){}
     loadData();
-    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels(); }
+    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels(); fbAuth(name); }
     hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
   }
   function muteIcon(key){
