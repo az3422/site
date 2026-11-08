@@ -88,8 +88,12 @@ button.ava:hover{background-color:var(--dim)}
 .st::after{content:"";position:absolute;right:-3px;bottom:-3px;width:.85rem;height:.85rem;border-radius:50%;background:#808080;border:2px solid var(--bg)}
 .st.on::after{background:#23c552}
 .memx,.membtn{display:none}
-.adm{color:#ff4d4d}
-.adm .bdg{color:var(--fg)}
+.adm,.mod{color:transparent;-webkit-text-fill-color:transparent;-webkit-background-clip:text;background-clip:text;background-size:300% auto;animation:shimmer 3.2s linear infinite}
+.adm{background-image:linear-gradient(90deg,#ff3b3b,#ffb0b0,#ff3b3b,#ffb0b0,#ff3b3b)}
+.mod{background-image:linear-gradient(90deg,#2f7bff,#a8ccff,#2f7bff,#a8ccff,#2f7bff)}
+.adm .bdg,.mod .bdg{color:var(--fg);-webkit-text-fill-color:var(--fg)}
+@keyframes shimmer{from{background-position:0% center}to{background-position:300% center}}
+@media (prefers-reduced-motion:reduce){.adm,.mod{animation:none}}
 .bdg{display:inline-block;border:2px solid var(--fg);border-radius:999px;padding:0 .45rem;font-size:.7rem;line-height:1.35;margin-left:.4rem;font-weight:500}
 .m .b{flex:1}
 .delmsg{margin-left:auto;align-self:flex-start;opacity:.5;min-width:2.3rem;padding:.3rem .6rem}
@@ -138,8 +142,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .m{display:flex;gap:.8rem;padding:.4rem 0}
 .m .b{min-width:0}
 .m .h{display:flex;align-items:baseline;gap:.5rem}
-.m .nm{background:none;border:0;padding:0;font-weight:500}
-.m .nm:hover{text-decoration:underline}
+.nm{background-color:transparent;border:0;padding:0;font-weight:500}
+.m .nm:hover,.fcard .nm:hover{text-decoration:underline;text-decoration-color:var(--fg)}
 .m time{font-size:.78rem;opacity:.6}
 .m p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
 .empty{margin:2rem auto;text-align:center;opacity:.7}
@@ -235,6 +239,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 
 <div class="modal" id="modal" hidden><div class="card" id="pcard"></div></div>
 
+<!-- Firebase SDK (только для сообщений и админки) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
@@ -249,6 +254,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var FORUM_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:middle;margin-right:.4rem" aria-hidden="true"><path d="M3 4h18v2H3V4zm0 5h18v2H3V9zm0 5h18v2H3v-2z"/></svg>';
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0;
 
+  
   var firebaseConfig = {
     apiKey:            "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
     authDomain:        "divine-net.firebaseapp.com",
@@ -259,7 +265,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   };
   var fbReady=false, fbdb=null;
   var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=90000, roles={}, bans={}, unsubRoles=null, unsubBans=null, pendMsg=null, pendBan=null, pendImg=null, mutes={}, unsubMutes=null;
-  var remoteUsers={};
+  var remoteUsers={};   
   try{
     if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
       firebase.initializeApp(firebaseConfig);
@@ -292,9 +298,11 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       }, function(e){ console.error("messages:",e); });
   }
 
+  
   function subscribeUsers(){
     if(!fbReady) return;
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
+    /* Сразу тянем всё принудительно (сработает даже если onSnapshot тормозит) */
     fbdb.collection("users").get().then(function(snap){
       var tmp={};
       snap.forEach(function(d){ tmp[d.id]=d.data(); });
@@ -302,6 +310,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       if(me){ renderMe(); renderMembers(); }
       renderMsgs();
     }).catch(function(e){ console.error("users.get:",e); });
+    /* И параллельно подписка на обновления */
     unsubUsers = fbdb.collection("users").onSnapshot(function(snap){
       var tmp={};
       snap.forEach(function(d){ tmp[d.id]=d.data(); });
@@ -311,6 +320,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     }, function(e){ console.error("users:",e); });
   }
 
+  /* ===== Онлайн-статус, список участников, удалённые аккаунты ===== */
   function isOnline(key){
     if(me&&key===me.key) return true;
     var t=presence[key]; return !!t&&Date.now()-t<PRES_TTL;
@@ -321,7 +331,17 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(me&&!src[me.key]) out.push({key:me.key,acc:getAcc(me.key)||{name:me.name}});
     return out;
   }
-  function isAdmin(key){ var r=roles[key]; return !!r&&r.role==="admin"; }
+  function roleOf(key){ var r=roles[key]; return r&&(r.role==="admin"||r.role==="mod")?r.role:null; }
+  function isAdmin(key){ return roleOf(key)==="admin"; }
+  function isMod(key){ return roleOf(key)==="mod"; }
+  function roleClass(key){ var r=roleOf(key); return r==="admin"?"adm":r==="mod"?"mod":""; }
+  function roleWord(key){ var r=roleOf(key); return r==="admin"?"админ":r==="mod"?"модератор":""; }
+  function canModerate(key){
+    if(!me||!fbReady||key===me.key) return false;
+    if(amAdmin()) return !isAdmin(key);
+    if(isMod(me.key)) return !roleOf(key);
+    return false;
+  }
   function amAdmin(){ return !!me&&isAdmin(me.key); }
   function renderMembers(){
     if(!me) return;
@@ -335,9 +355,9 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     ul.innerHTML="";
     function row(m){
       var li=el("li",m.on?"on":"off"), b=el("button"); b.type="button";
-      b.setAttribute("aria-label",m.name+(isAdmin(m.key)?", админ":"")+", "+(m.on?"в сети":"не в сети"));
+      b.setAttribute("aria-label",m.name+(roleWord(m.key)?", "+roleWord(m.key):"")+", "+(m.on?"в сети":"не в сети"));
       var st=el("span","st"+(m.on?" on":"")), a=el("span","ava s"); paint(a,m.acc,m.name); st.appendChild(a);
-      var t=el("span","t"), nl=el("span","nline"); nl.appendChild(el("span","nmx"+(isAdmin(m.key)?" adm":""),m.name));
+      var t=el("span","t"), nl=el("span","nline"); nl.appendChild(el("span","nmx"+(roleClass(m.key)?" "+roleClass(m.key):""),m.name));
       t.appendChild(nl); t.appendChild(el("small",null,m.on?"в сети":"не в сети"));
       b.appendChild(st); b.appendChild(t);
       b.onclick=function(){ app.classList.remove("showmem"); openProfile(m.key,m.name); };
@@ -345,9 +365,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       return li;
     }
     var ga=list.filter(function(m){return m.on&&isAdmin(m.key)});
-    var go=list.filter(function(m){return m.on&&!isAdmin(m.key)});
+    var gm=list.filter(function(m){return m.on&&isMod(m.key)});
+    var go=list.filter(function(m){return m.on&&!roleOf(m.key)});
     var gf=list.filter(function(m){return !m.on});
-    [["Админы",ga],["Участники в сети",go],["Не в сети",gf]].forEach(function(g){
+    [["Админы",ga],["Модераторы",gm],["Участники в сети",go],["Не в сети",gf]].forEach(function(g){
       if(!g[1].length) return;
       ul.appendChild(el("li","hd",g[0]+" — "+g[1].length));
       g[1].forEach(function(m){ ul.appendChild(row(m)); });
@@ -436,11 +457,14 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     },function(){});
   }
 
+  /* Имя занимается одной операцией. Имя считается занятым, если есть аккаунт ИЛИ профиль
+     (старые аккаунты, ещё не перенесённые в accounts, тоже защищены). Регистр букв не важен. */
   function claimAccount(key,name,salt,h,ownsProfile){
-    var ref=fbdb.collection("accounts").doc(key);
+    var ref=fbdb.collection("accounts").doc(key), uref=fbdb.collection("users").doc(key);
     return fbdb.runTransaction(function(tx){
-      return tx.get(ref).then(function(r){
-        if(r.exists) return "taken";
+      return Promise.all([tx.get(ref),tx.get(uref)]).then(function(r){
+        if(r[0].exists) return "taken";
+        if(r[1].exists&&!ownsProfile) return "taken";
         tx.set(ref,{name:name,salt:salt,hash:h,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
         return "ok";
       });
@@ -451,6 +475,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(!fbReady) return;
     fbdb.collection("users").doc(key).set(payload,{merge:true}).catch(function(e){console.error("saveUser:",e);});
   }
+  /* ========================================================================= */
 
   function rd(k,d){ try{ var v=JSON.parse(localStorage.getItem(k)); return v==null?d:v; }catch(e){ return d; } }
   function wr(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
@@ -471,6 +496,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
   function getAcc(key){ return remoteUsers[key] || users()[key] || null; }
 
+  /* ---------- мессенджер ---------- */
   function chan(){ return CH.filter(function(c){return c.id===cur})[0]; }
   function renderList(){
     var ul=$("list"); ul.innerHTML="";
@@ -500,7 +526,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       var b=el("div","b"), h=el("div","h"), n=el("button","nm",name); n.type="button";
       n.onclick=function(){ openProfile(m.by,name); };
       h.appendChild(n);
-      if(isAdmin(m.by)){ n.classList.add("adm"); n.setAttribute("aria-label",name+", админ"); }
+      if(roleClass(m.by)){ n.classList.add(roleClass(m.by)); n.setAttribute("aria-label",name+", "+roleWord(m.by)); }
       h.appendChild(el("time",null,new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
       b.appendChild(h); if(m.text) b.appendChild(el("p",null,m.text));
       if(okImg(m.image)){
@@ -543,7 +569,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       a.onclick=function(){ openProfile(m.by,name); };
       var n=el("button","nm",name); n.type="button";
       n.onclick=function(){ openProfile(m.by,name); };
-      if(isAdmin(m.by)){ n.classList.add("adm"); n.setAttribute("aria-label",name+", админ"); }
+      if(roleClass(m.by)){ n.classList.add(roleClass(m.by)); n.setAttribute("aria-label",name+", "+roleWord(m.by)); }
       head.appendChild(a); head.appendChild(n);
       head.appendChild(el("time",null,new Date(m.t).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})));
       card.appendChild(head);
@@ -670,6 +696,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(e.key===USERS){ renderMe(); renderMsgs(); }
   });
 
+  /* ---------- профиль ---------- */
   function closeProfile(){ $("modal").hidden=true; $("pcard").classList.remove("wide"); draft=null; }
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeProfile(); });
   $("modal").addEventListener("click",function(e){ if(e.target===$("modal")) closeProfile(); });
@@ -692,13 +719,16 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     r.readAsDataURL(file);
   }
 
+  /* ===== ФУНКЦИЯ ИЗМЕНЕНА: добавлен fallback через get() ===== */
   function adminPanel(key,name){
+    var asMod=!amAdmin(), MAXMIN=7*24*60;
     var p=el("div","apanel"), mu=muteOf(key), bn=!!bans[key];
     var reopen=function(){ openProfile(key,name); }, fail=function(e){ console.error("admin:",e); };
     var ts=firebase.firestore.FieldValue.serverTimestamp;
-    p.appendChild(el("h3",null,"Админ-панель"));
+    p.appendChild(el("h3",null,asMod?"Панель модератора":"Админ-панель"));
     var st=(bn?"Забанен. ":"")+(mu?"В муте "+muteLabel(mu)+".":"");
     if(st) p.appendChild(el("p","st2",st));
+    var msg=el("p","st2"); msg.setAttribute("role","alert"); msg.hidden=true;
     var r1=el("div","row2");
     if(mu){
       var um=el("button","sm","Снять мут"); um.type="button";
@@ -707,28 +737,33 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     }else{
       var num=el("input"); num.type="number"; num.min="1"; num.max="9999"; num.value="10"; num.setAttribute("aria-label","Сколько замьютить");
       var unit=el("select"); unit.setAttribute("aria-label","Единица времени");
-      [["минут",1],["часов",60],["дней",1440],["навсегда",0]].forEach(function(o){ var op=el("option",null,o[0]); op.value=String(o[1]); unit.appendChild(op); });
+      var opts=[["минут",1],["часов",60],["дней",1440]]; if(!asMod) opts.push(["навсегда",0]);
+      opts.forEach(function(o){ var op=el("option",null,o[0]); op.value=String(o[1]); unit.appendChild(op); });
       unit.onchange=function(){ num.disabled=unit.value==="0"; };
       var mb=el("button","sm","Замьютить"); mb.type="button";
       mb.onclick=function(){
         var u=parseInt(unit.value,10), n=Math.floor(Number(num.value));
         if(u&&!(n>=1)){ num.focus(); return; }
         n=Math.min(n,9999);
+        if(asMod&&(!u||n*u>MAXMIN)){ msg.textContent="Модератор может замьютить не больше чем на 7 дней."; msg.hidden=false; return; }
         fbdb.collection("mutes").doc(key).set({by:me.key,until:u?Date.now()+n*u*60000:0,t:ts()}).then(reopen).catch(fail);
       };
       r1.appendChild(num); r1.appendChild(unit); r1.appendChild(mb);
     }
-    p.appendChild(r1);
-    var r2=el("div","row2"), sure=false, bb=el("button","sm",bn?"Разбанить":"Забанить"); bb.type="button";
-    bb.onclick=function(){
-      if(bn){ fbdb.collection("bans").doc(key).delete().then(reopen).catch(fail); return; }
-      if(!sure){ sure=true; bb.textContent="Точно забанить?"; return; }
-      fbdb.collection("bans").doc(key).set({by:me.key,t:ts()}).then(reopen).catch(fail);
-    };
-    r2.appendChild(bb); p.appendChild(r2);
+    p.appendChild(r1); p.appendChild(msg);
+    if(!asMod){
+      var r2=el("div","row2"), sure=false, bb=el("button","sm",bn?"Разбанить":"Забанить"); bb.type="button";
+      bb.onclick=function(){
+        if(bn){ fbdb.collection("bans").doc(key).delete().then(reopen).catch(fail); return; }
+        if(!sure){ sure=true; bb.textContent="Точно забанить?"; return; }
+        fbdb.collection("bans").doc(key).set({by:me.key,t:ts()}).then(reopen).catch(fail);
+      };
+      r2.appendChild(bb); p.appendChild(r2);
+    }
     return p;
   }
   function openProfile(key,name){
+    /* Если профиль ещё не подгружен — тянем его напрямую из Firestore */
     if(!getAcc(key) && fbReady){
       var _box=$("pcard"); _box.innerHTML=""; $("modal").hidden=false;
       _box.appendChild(el("p","empty","Загрузка профиля…"));
@@ -757,7 +792,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       paint(av,acc,name);
       pf.appendChild(el("p",null,acc?(acc.bio||"Описание не указано."):"Аккаунт удалён."));
       box.appendChild(pf);
-      if(acc&&fbReady&&amAdmin()&&me&&key!==me.key&&!isAdmin(key)) box.appendChild(adminPanel(key,name));
+      if(acc&&canModerate(key)) box.appendChild(adminPanel(key,name));
       var c1=el("button","btn ghost full","Закрыть"); c1.type="button"; c1.onclick=closeProfile; box.appendChild(c1);
       c1.focus(); return;
     }
@@ -794,6 +829,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     sync();
   }
 
+  /* ---------- вход, регистрация, админ ---------- */
   function hidePw(){
     $("eye").setAttribute("aria-pressed","false"); $("eye").textContent="Показать пароль";
     $("p").type="password"; $("p2").type="password";
@@ -842,6 +878,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     $("adminView").hidden=!on;
   }
   function showAdmin(){
+    /* Если Firebase подключён — показываем ВСЕХ со всех устройств */
     if(fbReady){
       adminToggle(true);
       $("adCount").textContent="Загрузка…";
@@ -858,9 +895,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         var ul=$("adList"); ul.innerHTML="";
         list.forEach(function(u){
           var li=el("li"), a=el("span","ava s"); paint(a,u.data,u.data.name);
-          var nm=u.data.name||u.key, isA=!!rl[u.key]&&rl[u.key].role==="admin", isB=!!bn[u.key];
+          var nm=u.data.name||u.key, isA=!!rl[u.key]&&rl[u.key].role==="admin", isM=!!rl[u.key]&&rl[u.key].role==="mod", isB=!!bn[u.key];
           var nl=el("span","n",nm);
           if(isA) nl.classList.add("adm");
+          if(isM) nl.classList.add("mod");
           if(isB) nl.appendChild(el("span","bdg","бан"));
           var fail=function(e){ $("adCount").textContent="Не удалось: "+e.message; };
           var acts=el("div","acts");
@@ -868,6 +906,11 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
           rb.onclick=function(){
             rb.disabled=true;
             (isA?fbdb.collection("roles").doc(u.key).delete():fbdb.collection("roles").doc(u.key).set({role:"admin",t:firebase.firestore.FieldValue.serverTimestamp()})).then(showAdmin).catch(fail);
+          };
+          var mdb=el("button","sm",isM?"Снять модератора":"Дать модератора"); mdb.type="button";
+          mdb.onclick=function(){
+            mdb.disabled=true;
+            (isM?fbdb.collection("roles").doc(u.key).delete():fbdb.collection("roles").doc(u.key).set({role:"mod",t:firebase.firestore.FieldValue.serverTimestamp()})).then(showAdmin).catch(fail);
           };
           var bb=el("button","sm",isB?"Разбан":"Бан"); bb.type="button";
           bb.onclick=function(){
@@ -891,7 +934,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
               fbdb.collection("mutes").doc(u.key).delete()
             ]).then(showAdmin).catch(fail);
           };
-          acts.appendChild(rb); acts.appendChild(bb); acts.appendChild(b);
+          acts.appendChild(rb); acts.appendChild(mdb); acts.appendChild(bb); acts.appendChild(b);
           li.appendChild(a); li.appendChild(nl); li.appendChild(acts); ul.appendChild(li);
         });
         ul.hidden=!list.length;
@@ -901,6 +944,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       });
       return;
     }
+    /* Fallback: старый локальный список */
     var all=users(), keys=Object.keys(all).sort(), ul=$("adList"); ul.innerHTML="";
     keys.forEach(function(k){
       var li=el("li"), a=el("span","ava s"); paint(a,all[k],all[k].name);
@@ -935,6 +979,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(pw.length<6){ err.textContent="Пароль должен быть не короче 6 символов."; return; }
     var all=users(), key=name.toLowerCase();
     if(!fbReady){
+      /* без Firebase: старая локальная схема */
       if(mode==="up"){
         if(pw!==$("p2").value){ err.textContent="Пароли не совпадают."; return; }
         if(all[key]){ err.textContent="Такое имя уже занято."; return; }
@@ -955,6 +1000,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       }
       return;
     }
+    /* с Firebase: аккаунты общие для всех устройств */
     var TAKEN="Такое имя уже занято (регистр букв не важен). Если это ваш аккаунт, откройте вкладку «Вход».";
     var srvErr=function(e){ console.error("auth:",e); err.textContent="Не удалось связаться с сервером. Попробуйте позже."; };
     if(mode==="up"){
@@ -964,7 +1010,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       var salt=Array.prototype.join.call(arr,"-");
       hash(pw,salt).then(function(h){ return claimAccount(key,name,salt,h); }).then(function(r){
         if(r==="taken"){ err.textContent=TAKEN; return; }
-        fbSaveUser(key,{name:name});
+        fbSaveUser(key,{name:name,avatar:"",bio:""});
         return fbdb.collection("deleted").doc(key).delete().catch(function(){}).then(function(){ $("authForm").reset(); enter(name); });
       }).catch(srvErr);
       return;
@@ -977,6 +1023,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
           enterChecked(ac.name||name);
         });
       }
+      /* в базе аккаунта нет: пробуем перенести старый аккаунт, созданный на этом устройстве */
       var la=all[key];
       if(!la){ err.textContent="Аккаунт не найден. Создайте его на вкладке «Регистрация»."; return; }
       return Promise.all([hash(pw,la.salt),checkDeleted(key)]).then(function(r){
@@ -984,7 +1031,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         if(r[0]!==la.hash){ err.textContent="Неверный пароль."; return; }
         return claimAccount(key,la.name,la.salt,la.hash,true).then(function(res){
           if(res==="taken"){ err.textContent="Неверный пароль."; return; }
-          fbSaveUser(key,{name:la.name});
           enterChecked(la.name);
         });
       });
@@ -1002,11 +1048,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         if(!la0){ dropSession(); return; }
         return checkDeleted(sk).then(function(del){
           if(del){ var u=users(); delete u[sk]; wr(USERS,u); dropSession(); return; }
-          return claimAccount(sk,la0.name,la0.salt,la0.hash,true).then(function(res){
-            if(res==="taken"){ dropSession(); return; }
-            fbSaveUser(sk,{name:la0.name});
-            enterChecked(la0.name);
-          });
+          enterChecked(la0.name);
         });
       }).catch(function(){ if(la0) enter(la0.name); });
     }
