@@ -24,6 +24,7 @@ button{cursor:pointer}
 ul{list-style:none;margin:0;padding:0}
 :focus-visible{outline:3px solid var(--fg);outline-offset:2px}
 h1,h2{font-family:var(--display);margin:0}
+h1{color:transparent;-webkit-text-fill-color:transparent;-webkit-background-clip:text;background-clip:text;background-size:300% auto;animation:shimmer 3.2s linear infinite;background-image:linear-gradient(90deg,#fff,#000,#fff,#000,#fff)}
 
 .ava{flex:none;width:2.6rem;height:2.6rem;border-radius:50%;border:2px solid var(--fg);background-color:var(--bg);background-size:cover;background-position:center;display:grid;place-items:center;font-family:var(--display);font-size:1rem;padding:0;overflow:hidden}
 .ava.s{width:2rem;height:2rem;font-size:.8rem}
@@ -98,9 +99,7 @@ button.ava:hover{background-color:var(--dim)}
 .mod{background-image:linear-gradient(90deg,#2f7bff,#a8ccff,#2f7bff,#a8ccff,#2f7bff)}
 .adm .bdg,.mod .bdg{color:var(--fg);-webkit-text-fill-color:var(--fg)}
 @keyframes shimmer{from{background-position:0% center}to{background-position:300% center}}
-@media (prefers-reduced-motion:reduce){.adm,.mod{animation:none}.list li.unread button::before{animation:none;background:linear-gradient(90deg,#a855f7,#e879f9,#a855f7)}}
-.list li.unread button{position:relative}
-.list li.unread button::before{content:"";position:absolute;inset:0;padding:2px;border-radius:.6rem;background:linear-gradient(90deg,#a855f7,#e879f9,#c084fc,#e879f9,#a855f7);background-size:300% 100%;animation:shimmer 3.2s linear infinite;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.adm,.mod,h1{animation:none}h1{background-image:linear-gradient(90deg,#fff,#888,#fff)}}
 .bdg{display:inline-block;border:2px solid var(--fg);border-radius:999px;padding:0 .45rem;font-size:.7rem;line-height:1.35;margin-left:.4rem;font-weight:500}
 .m .b{flex:1}
 .delmsg{margin-left:auto;align-self:flex-start;opacity:.5;min-width:2.3rem;padding:.3rem .6rem}
@@ -267,7 +266,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var FORUM_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:middle;margin-right:.4rem" aria-hidden="true"><path d="M3 4h18v2H3V4zm0 5h18v2H3V9zm0 5h18v2H3v-2z"/></svg>';
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="", swapUntil=0, loadedCh={};
-  var unreadCh={}, lastSeenCh={}, unsubAll={}, firstSnapCh={};
 
   var firebaseConfig = {
     apiKey:            "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
@@ -311,34 +309,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         data[channelId]=arr;
         if(cur===channelId) renderMsgs();
       }, function(e){ console.error("messages:",e); loadedCh[channelId]=true; if(cur===channelId) renderMsgs(); });
-  }
-
-  function watchAllChannels(){
-    if(!fbReady) return;
-    CH.forEach(function(c){
-      if(unsubAll[c.id]) return;
-      firstSnapCh[c.id]=true;
-      unsubAll[c.id]=fbdb.collection("channels").doc(c.id).collection("messages")
-        .orderBy("createdAt","desc").limit(1)
-        .onSnapshot(function(snap){
-          var latest=null;
-          snap.forEach(function(d){
-            var x=d.data();
-            var t=x.createdAt?x.createdAt.toDate().getTime():0;
-            if(!latest||t>latest.t) latest={t:t,by:x.by};
-          });
-          if(!latest) return;
-          if(firstSnapCh[c.id]){ firstSnapCh[c.id]=false; lastSeenCh[c.id]=latest.t; return; }
-          if(c.id===cur){ lastSeenCh[c.id]=latest.t; delete unreadCh[c.id]; return; }
-          if(latest.by!==me.key && latest.t>(lastSeenCh[c.id]||0)){
-            if(!unreadCh[c.id]){ unreadCh[c.id]=true; renderList(); }
-          }
-        },function(e){ console.error("watch:"+c.id,e); });
-    });
-  }
-  function stopWatchAll(){
-    Object.keys(unsubAll).forEach(function(k){ try{ unsubAll[k](); }catch(e){} });
-    unsubAll={}; firstSnapCh={}; unreadCh={}; lastSeenCh={};
   }
 
   function subscribeUsers(){
@@ -541,10 +511,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       if(!items.length) return;
       ul.appendChild(el("li","cat",g[0]));
       items.forEach(function(c){
-        var li=el("li", c.id===cur ? "on" : (unreadCh[c.id] ? "unread" : "")), b=el("button"); b.type="button";
+        var li=el("li",c.id===cur?"on":""), b=el("button"); b.type="button";
         if(c.forum){ b.innerHTML=FORUM_SVG; b.appendChild(document.createTextNode(c.name)); }
         else { b.textContent="# "+c.name; }
-        b.onclick=function(){ cur=c.id; delete unreadCh[c.id]; lastSeenCh[c.id]=Date.now(); app.classList.add("open"); if(fbReady) subscribeMessages(cur); swapUntil=Date.now()+1500; render(true); $("input").focus(); };
+        b.onclick=function(){ cur=c.id; app.classList.add("open"); if(fbReady) subscribeMessages(cur); swapUntil=Date.now()+1500; render(true); $("input").focus(); };
         li.appendChild(b); ul.appendChild(li);
       });
     });
@@ -655,7 +625,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     me={key:name.toLowerCase(),name:name};
     try{ localStorage.setItem(SESSION,name); }catch(e){}
     loadData();
-    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels(); }
+    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); }
     hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
   }
   function muteIcon(key){
@@ -743,7 +713,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   $("out").onclick=function(){
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
-    stopPresence(true); stopWatchAll(); if(unsubDel){ unsubDel(); unsubDel=null; }
+    stopPresence(true); if(unsubDel){ unsubDel(); unsubDel=null; }
     if(unsubRoles){ unsubRoles(); unsubRoles=null; } if(unsubBans){ unsubBans(); unsubBans=null; } if(unsubMutes){ unsubMutes(); unsubMutes=null; }
     roles={}; bans={}; mutes={}; pendMsg=null; pendBan=null;
     remoteUsers={}; presence={};
