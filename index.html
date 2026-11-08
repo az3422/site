@@ -68,7 +68,7 @@ button.ava:hover{background-color:var(--dim)}
 .adl li span.n{flex:1;min-width:0;overflow-wrap:anywhere}
 
 .pf{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.6rem;margin-bottom:1rem}
-.pf p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.pf p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.85rem;opacity:.7}
 .pbanner{margin:-1.75rem -1.75rem 0;height:7.5rem;background-size:cover;background-position:center;border-radius:calc(1.1rem - 2px) calc(1.1rem - 2px) 0 0;border-bottom:2px solid var(--fg)}
 .pbanner.none{height:3.5rem;display:grid;place-items:center;font-size:.85rem;opacity:.7;border-bottom:2px dashed var(--fg)}
 .pf.withb{margin-top:-3.4rem}
@@ -138,6 +138,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .list button{display:block;width:100%;text-align:left;background:none;border:0;border-radius:.6rem;padding:.6rem .7rem;font-weight:500}
 .list button:hover{background:var(--dim)}
 .list li.on button{background:var(--fg);color:var(--bg)}
+.list li.unread button{position:relative}
+.list li.unread button::before{content:"";position:absolute;inset:0;padding:2px;border-radius:.6rem;background:linear-gradient(90deg,#a855f7,#e879f9,#c084fc,#e879f9,#a855f7);background-size:300% 100%;animation:shimmer 3.2s linear infinite;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
 .me{display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;border-top:2px solid var(--fg)}
 .mebtn{display:flex;align-items:center;gap:.6rem;flex:1;min-width:0;background:none;border:0;padding:.2rem;text-align:left;border-radius:.6rem}
 .mebtn:hover{background:var(--dim)}
@@ -170,6 +172,25 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .fcard:hover .delmsg,.fcard .delmsg:focus-visible{opacity:1}
 .sendbar{display:flex;gap:.6rem;padding:.8rem 1.25rem;border-top:2px solid var(--fg)}
 #input{flex:1;min-width:0;background:var(--bg);border:2px solid var(--fg);border-radius:999px;padding:.65rem 1.1rem}
+
+.cmtopt{display:flex;align-items:center;gap:.5rem;padding:.5rem 1.25rem;font-size:.9rem;cursor:pointer;border-top:2px solid var(--fg);user-select:none}
+.cmtopt input{width:1.1rem;height:1.1rem;accent-color:#fff;cursor:pointer;margin:0}
+.postft{display:flex;align-items:center;gap:.6rem;margin-top:.4rem;padding-top:.5rem;border-top:1px dashed rgba(255,255,255,.15)}
+.cmtbtn{background:none;border:2px solid var(--fg);border-radius:999px;padding:.25rem .75rem;font-size:.82rem;font-weight:500;opacity:.85;cursor:pointer}
+.cmtbtn:hover{background:var(--fg);color:var(--bg);opacity:1}
+.cmtbtn.off{opacity:.5}
+.cmtbtn.off:hover{opacity:.85}
+.cmts{display:flex;flex-direction:column;gap:.5rem;max-height:40vh;overflow-y:auto;margin:.8rem 0;padding:.6rem 0;border-top:1px solid rgba(255,255,255,.15);border-bottom:1px solid rgba(255,255,255,.15)}
+.cmt{display:flex;gap:.6rem;padding:.2rem 0;align-items:flex-start}
+.cmt .cb{flex:1;min-width:0}
+.cmt .ch{display:flex;align-items:baseline;gap:.5rem}
+.cmt time{font-size:.72rem;opacity:.6}
+.cmt p{margin:0;font-size:.92rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.cmtform{display:flex;gap:.5rem;margin-top:.6rem}
+.cmtform input{flex:1;min-width:0;background:var(--bg);border:2px solid var(--fg);border-radius:999px;padding:.55rem 1rem;font-size:.92rem}
+.cmtform .btn{padding:.5rem .9rem;min-height:auto}
+.noallow{font-size:.85rem;opacity:.7;margin:.4rem 0;text-align:center;padding:.5rem}
+.cmtempty{font-size:.85rem;opacity:.6;text-align:center;padding:.6rem}
 
 @media (max-width:1000px){
   .app{grid-template-columns:300px 1fr}
@@ -237,6 +258,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     <p class="serr" id="serr" role="alert" hidden></p>
     <div class="prev" id="prev" hidden><img id="prevImg" alt="Выбранное фото"><button type="button" class="sm" id="prevX">Убрать</button></div>
     <div class="locked" id="locked" hidden>Следите за новостями</div>
+    <label class="cmtopt" id="cmtOptRow" hidden>
+      <input type="checkbox" id="cmtOpt" checked>
+      <span>Разрешить комментарии к посту</span>
+    </label>
     <form class="sendbar" id="form" autocomplete="off">
       <input type="text" id="input" aria-label="Сообщение" maxlength="2000">
       <input type="file" id="file" accept="image/*" hidden>
@@ -266,6 +291,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var GLYPHS=["◐","◑","▲","●","■","✦","☾","☻"];
   var FORUM_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:middle;margin-right:.4rem" aria-hidden="true"><path d="M3 4h18v2H3V4zm0 5h18v2H3V9zm0 5h18v2H3v-2z"/></svg>';
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="", swapUntil=0, loadedCh={};
+  var unreadCh={}, lastSeenCh={}, unsubAll={}, firstSnapCh={};
+  var postCommentsSub=null;
 
   var firebaseConfig = {
     apiKey:            "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
@@ -301,6 +328,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
             name: x.name,
             text: x.text,
             image: x.image||"",
+            commentsEnabled: x.commentsEnabled,
+            commentsCount: x.commentsCount||0,
             t: x.createdAt ? x.createdAt.toDate().getTime() : Date.now()
           });
         });
@@ -309,6 +338,34 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         data[channelId]=arr;
         if(cur===channelId) renderMsgs();
       }, function(e){ console.error("messages:",e); loadedCh[channelId]=true; if(cur===channelId) renderMsgs(); });
+  }
+
+  function watchAllChannels(){
+    if(!fbReady) return;
+    CH.forEach(function(c){
+      if(unsubAll[c.id]) return;
+      firstSnapCh[c.id]=true;
+      unsubAll[c.id]=fbdb.collection("channels").doc(c.id).collection("messages")
+        .orderBy("createdAt","desc").limit(1)
+        .onSnapshot(function(snap){
+          var latest=null;
+          snap.forEach(function(d){
+            var x=d.data();
+            var t=x.createdAt?x.createdAt.toDate().getTime():0;
+            if(!latest||t>latest.t) latest={t:t,by:x.by};
+          });
+          if(!latest) return;
+          if(firstSnapCh[c.id]){ firstSnapCh[c.id]=false; lastSeenCh[c.id]=latest.t; return; }
+          if(c.id===cur){ lastSeenCh[c.id]=latest.t; delete unreadCh[c.id]; return; }
+          if(latest.by!==me.key && latest.t>(lastSeenCh[c.id]||0)){
+            if(!unreadCh[c.id]){ unreadCh[c.id]=true; renderList(); }
+          }
+        },function(e){ console.error("watch:"+c.id,e); });
+    });
+  }
+  function stopWatchAll(){
+    Object.keys(unsubAll).forEach(function(k){ try{ unsubAll[k](); }catch(e){} });
+    unsubAll={}; firstSnapCh={}; unreadCh={}; lastSeenCh={};
   }
 
   function subscribeUsers(){
@@ -511,10 +568,10 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       if(!items.length) return;
       ul.appendChild(el("li","cat",g[0]));
       items.forEach(function(c){
-        var li=el("li",c.id===cur?"on":""), b=el("button"); b.type="button";
+        var li=el("li", c.id===cur ? "on" : (unreadCh[c.id] ? "unread" : "")), b=el("button"); b.type="button";
         if(c.forum){ b.innerHTML=FORUM_SVG; b.appendChild(document.createTextNode(c.name)); }
         else { b.textContent="# "+c.name; }
-        b.onclick=function(){ cur=c.id; app.classList.add("open"); if(fbReady) subscribeMessages(cur); swapUntil=Date.now()+1500; render(true); $("input").focus(); };
+        b.onclick=function(){ cur=c.id; delete unreadCh[c.id]; lastSeenCh[c.id]=Date.now(); app.classList.add("open"); if(fbReady) subscribeMessages(cur); swapUntil=Date.now()+1500; render(true); $("input").focus(); };
         li.appendChild(b); ul.appendChild(li);
       });
     });
@@ -593,6 +650,18 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         ib.onclick=function(){ openImage(m.image); };
         ib.appendChild(im); card.appendChild(ib);
       }
+      var ft=el("div","postft");
+      var cnt=m.commentsCount||0;
+      var cbtn;
+      if(m.commentsEnabled===false){
+        cbtn=el("button","cmtbtn off","Комментарии отключены"); cbtn.type="button";
+        cbtn.onclick=function(){ openPost(m.id); };
+      } else {
+        cbtn=el("button","cmtbtn","💬 Комментарии"+(cnt>0?" ("+cnt+")":"")); cbtn.type="button";
+        cbtn.onclick=function(){ openPost(m.id); };
+      }
+      ft.appendChild(cbtn);
+      card.appendChild(ft);
       if(fbReady&&amAdmin()&&m.id){
         var acts=el("div","actions");
         var x=el("button","sm delmsg",pendMsg===m.id?"Удалить?":"Удалить пост"); x.type="button";
@@ -625,7 +694,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     me={key:name.toLowerCase(),name:name};
     try{ localStorage.setItem(SESSION,name); }catch(e){}
     loadData();
-    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); }
+    if(fbReady){ subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels(); }
     hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
   }
   function muteIcon(key){
@@ -656,6 +725,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     var w=canWrite(), media=(cur==="media"||cur==="scripts")&&fbReady;
     $("form").hidden=!w; $("locked").hidden=w; $("locked").textContent=lockText();
     $("clip").hidden=!media||!w;
+    $("cmtOptRow").hidden = !(cur==="scripts" && w && fbReady);
     if(!media||!w) clearAttach();
   }
   function shrink(file,cb){
@@ -698,6 +768,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(fbReady){
       var doc={by:me.key,name:me.name,text:t.slice(0,2000),createdAt:firebase.firestore.FieldValue.serverTimestamp()};
       if(img) doc.image=img;
+      if(cur==="scripts"){ doc.commentsEnabled = $("cmtOpt").checked; }
       fbdb.collection("channels").doc(cur).collection("messages").add(doc)
         .catch(function(err){ console.error("send:",err); sendErr("Не удалось отправить. Попробуйте ещё раз."); });
       $("input").value=""; clearAttach();
@@ -713,8 +784,9 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   $("out").onclick=function(){
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
-    stopPresence(true); if(unsubDel){ unsubDel(); unsubDel=null; }
+    stopPresence(true); stopWatchAll(); if(unsubDel){ unsubDel(); unsubDel=null; }
     if(unsubRoles){ unsubRoles(); unsubRoles=null; } if(unsubBans){ unsubBans(); unsubBans=null; } if(unsubMutes){ unsubMutes(); unsubMutes=null; }
+    if(postCommentsSub){ try{ postCommentsSub(); }catch(e){} postCommentsSub=null; }
     roles={}; bans={}; mutes={}; pendMsg=null; pendBan=null;
     remoteUsers={}; presence={};
     try{ localStorage.removeItem(SESSION); }catch(e){}
@@ -726,7 +798,12 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(e.key===USERS){ renderMe(); renderMsgs(); }
   });
 
-  function closeProfile(){ $("modal").hidden=true; $("pcard").classList.remove("wide"); draft=null; }
+  function closeProfile(){
+    $("modal").hidden=true;
+    $("pcard").classList.remove("wide");
+    draft=null;
+    if(postCommentsSub){ try{ postCommentsSub(); }catch(e){} postCommentsSub=null; }
+  }
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeProfile(); });
   $("modal").addEventListener("click",function(e){ if(e.target===$("modal")) closeProfile(); });
   $("meBtn").onclick=function(){ openProfile(me.key,me.name); };
@@ -746,6 +823,90 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     };
     r.onerror=function(){ cb(null); };
     r.readAsDataURL(file);
+  }
+
+  function renderComments(box, cmts){
+    box.innerHTML="";
+    if(!cmts.length){ box.appendChild(el("p","cmtempty","Комментариев пока нет")); return; }
+    cmts.forEach(function(c){
+      var acc=getAcc(c.by);
+      var row=el("div","cmt");
+      var a=el("button","ava s"); a.type="button"; paint(a, acc, c.name||c.by);
+      a.onclick=function(){ openProfile(c.by, c.name||c.by); };
+      var b=el("div","cb");
+      var h=el("div","ch");
+      var n=el("button","nm", c.name||c.by); n.type="button";
+      if(roleClass(c.by)){ n.classList.add(roleClass(c.by)); }
+      n.onclick=function(){ openProfile(c.by, c.name||c.by); };
+      h.appendChild(n);
+      h.appendChild(el("time", null, new Date(c.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
+      b.appendChild(h);
+      b.appendChild(el("p", null, c.text));
+      row.appendChild(a); row.appendChild(b);
+      box.appendChild(row);
+    });
+    box.scrollTop=box.scrollHeight;
+  }
+
+  function openPost(postId){
+    if(postCommentsSub){ try{ postCommentsSub(); }catch(e){} postCommentsSub=null; }
+    var post=(data.scripts||[]).find(function(p){ return p.id===postId; });
+    if(!post) return;
+    var box=$("pcard");
+    box.innerHTML="";
+    box.classList.remove("wide");
+    $("modal").hidden=false;
+    var acc=getAcc(post.by);
+    var name=(acc&&acc.name)||post.name||post.by;
+    var pf=el("div","pf");
+    var av=el("div","ava l"); paint(av, acc, name);
+    var nm=el("h2", null, name);
+    if(roleClass(post.by)){ nm.classList.add(roleClass(post.by)); }
+    pf.appendChild(av); pf.appendChild(nm);
+    pf.appendChild(el("p", null, new Date(post.t).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})));
+    box.appendChild(pf);
+    if(post.text) box.appendChild(el("p","fp",post.text));
+    if(okImg(post.image)){
+      var im=el("img","big"); im.src=post.image; im.alt="Фото"; im.style.cursor="zoom-in";
+      im.onclick=function(){ openImage(post.image); };
+      box.appendChild(im);
+    }
+    var cbox=el("div","cmts");
+    box.appendChild(cbox);
+    if(post.commentsEnabled===false){
+      cbox.appendChild(el("p","noallow","Комментарии к этому посту отключены"));
+    } else {
+      cbox.appendChild(el("p","cmtempty","Загрузка комментариев…"));
+      postCommentsSub = fbdb.collection("channels").doc("scripts").collection("messages").doc(postId).collection("comments")
+        .orderBy("createdAt","asc").limit(100)
+        .onSnapshot(function(snap){
+          var cmts=[];
+          snap.forEach(function(d){
+            var x=d.data();
+            cmts.push({id:d.id, by:x.by, name:x.name, text:x.text, t: x.createdAt ? x.createdAt.toDate().getTime() : Date.now()});
+          });
+          renderComments(cbox, cmts);
+        }, function(e){ console.error("comments:",e); cbox.innerHTML=""; cbox.appendChild(el("p","noallow","Ошибка загрузки комментариев")); });
+      var cf=el("form","cmtform");
+      var ci=el("input"); ci.type="text"; ci.maxLength=1000; ci.placeholder="Комментарий..."; ci.setAttribute("aria-label","Комментарий");
+      var cb=el("button","btn"); cb.type="submit"; cb.textContent="→";
+      cf.appendChild(ci); cf.appendChild(cb);
+      cf.onsubmit=function(e){
+        e.preventDefault();
+        var txt=ci.value.trim(); if(!txt || !me) return;
+        ci.value="";
+        var comment={by:me.key, name:me.name, text:txt.slice(0,1000), createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+        var batch=fbdb.batch();
+        var cref=fbdb.collection("channels").doc("scripts").collection("messages").doc(postId).collection("comments").doc();
+        var pref=fbdb.collection("channels").doc("scripts").collection("messages").doc(postId);
+        batch.set(cref, comment);
+        batch.update(pref, {commentsCount: firebase.firestore.FieldValue.increment(1)});
+        batch.commit().catch(function(e){ console.error("comment add:",e); });
+      };
+      box.appendChild(cf);
+    }
+    var close=el("button","btn ghost full","Закрыть"); close.type="button"; close.style.marginTop=".8rem"; close.onclick=closeProfile;
+    box.appendChild(close);
   }
 
   function loadBanner(key,cb){
@@ -827,8 +988,9 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     return p;
   }
   function openProfile(key,name){
+    if(postCommentsSub){ try{ postCommentsSub(); }catch(e){} postCommentsSub=null; }
     if(!getAcc(key) && fbReady){
-      var _box=$("pcard"); _box.innerHTML=""; $("modal").hidden=false;
+      var _box=$("pcard"); _box.innerHTML=""; _box.classList.remove("wide"); $("modal").hidden=false;
       _box.appendChild(el("p","empty","Загрузка профиля…"));
       fbdb.collection("users").doc(key).get().then(function(d){
         if(d.exists){
