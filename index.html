@@ -140,6 +140,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
 .list li.on button{background:var(--fg);color:var(--bg)}
 .list li.unread button{position:relative}
 .list li.unread button::before{content:"";position:absolute;inset:0;padding:2px;border-radius:.6rem;background:linear-gradient(90deg,#a855f7,#e879f9,#c084fc,#e879f9,#a855f7);background-size:300% 100%;animation:shimmer 3.2s linear infinite;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+#dmlist{max-height:40vh;flex:none;border-top:2px solid var(--fg)}
+.dm-close{opacity:.5;font-size:.85rem;margin-left:.5rem}
 .me{display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;border-top:2px solid var(--fg)}
 .mebtn{display:flex;align-items:center;gap:.6rem;flex:1;min-width:0;background:none;border:0;padding:.2rem;text-align:left;border-radius:.6rem}
 .mebtn:hover{background:var(--dim)}
@@ -208,6 +210,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   .back{display:grid}
   .top{padding:.7rem 1rem;gap:.6rem}
   .ttl{flex-direction:column;align-items:flex-start;gap:0}
+  #dmlist{max-height:35vh}
 }
 </style>
 </head>
@@ -243,6 +246,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   <aside class="side">
     <h1>DIVINE.NET</h1>
     <ul class="list" id="list"></ul>
+    <ul class="list" id="dmlist"></ul>
     <div class="me">
       <button class="mebtn" id="meBtn" type="button" aria-label="Открыть мой профиль"><span class="ava s" id="meAva"></span><span id="who"></span></button>
       <button class="sm" id="out" type="button">Выйти</button>
@@ -252,6 +256,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     <div class="top">
       <button class="back" id="back" type="button" aria-label="Назад к списку каналов">←</button>
       <div class="ttl"><b id="topName"></b><small id="topSub"></small></div>
+      <button class="sm" id="dmLockBtn" type="button" hidden>Закрыть</button>
       <button class="sm membtn" id="memBtn" type="button">Участники</button>
     </div>
     <div class="msgs" id="msgs" aria-live="polite"></div>
@@ -294,6 +299,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="", swapUntil=0, loadedCh={};
   var unreadCh={}, lastSeenCh={}, unsubAll={}, firstSnapCh={};
   var postCommentsSub=null;
+  var dms={}, unsubDMs=null, dmUser=null, unsubDM=null, dmData=[];
 
   var firebaseConfig = {
     apiKey:            "AIzaSyDOHK7PjvtA7Z5g4EiOnZGIMthm-HCd7LQ",
@@ -395,6 +401,51 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function stopWatchAll(){
     Object.keys(unsubAll).forEach(function(k){ try{ unsubAll[k](); }catch(e){} });
     unsubAll={}; firstSnapCh={}; unreadCh={}; lastSeenCh={};
+  }
+
+  function subscribeDMs(){
+    if(!fbReady) return;
+    if(unsubDMs){ unsubDMs(); unsubDMs=null; }
+    unsubDMs = fbdb.collection("dms").onSnapshot(function(snap){
+      dms={};
+      snap.forEach(function(d){ dms[d.id]=d.data(); });
+      renderList();
+      if(dmUser) renderDM();
+      applyComposer();
+    },function(e){ console.error("dms:",e); });
+  }
+
+  function subscribeDM(userKey){
+    if(unsubDM){ unsubDM(); unsubDM=null; }
+    if(!fbReady){ dmData=[]; return; }
+    unsubDM = fbdb.collection("dms").doc(userKey).collection("messages")
+      .orderBy("t","asc").limit(200)
+      .onSnapshot(function(snap){
+        var arr=[];
+        snap.forEach(function(d){
+          var x=d.data();
+          arr.push({id:d.id, by:x.by, name:x.name, text:x.text, t: x.t && x.t.toMillis ? x.t.toMillis() : Date.now()});
+        });
+        dmData=arr;
+        if(dmUser===userKey) renderDM();
+      },function(e){ console.error("dm:",e); });
+  }
+
+  function openDM(userKey){
+    dmUser=userKey;
+    dmData=[];
+    subscribeDM(userKey);
+    app.classList.add("open");
+    $("memBtn").hidden=true;
+    render(true);
+  }
+  function closeDM(){
+    dmUser=null;
+    if(unsubDM){ unsubDM(); unsubDM=null; }
+    dmData=[];
+    $("dmLockBtn").hidden=true;
+    $("memBtn").hidden=false;
+    render(true);
   }
 
   function subscribeUsers(){
@@ -597,16 +648,49 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       if(!items.length) return;
       ul.appendChild(el("li","cat",g[0]));
       items.forEach(function(c){
-        var li=el("li", c.id===cur ? "on" : (unreadCh[c.id] ? "unread" : "")), b=el("button"); b.type="button";
+        var li=el("li", c.id===cur && !dmUser ? "on" : (unreadCh[c.id] ? "unread" : "")), b=el("button"); b.type="button";
         if(c.forum){ b.innerHTML=FORUM_SVG; b.appendChild(document.createTextNode(c.name)); }
         else { b.textContent="# "+c.name; }
-        b.onclick=function(){ cur=c.id; delete unreadCh[c.id]; lastSeenCh[c.id]=Date.now(); app.classList.add("open"); if(fbReady) subscribeMessages(cur); swapUntil=Date.now()+1500; render(true); $("input").focus(); };
+        b.onclick=function(){
+          dmUser=null; if(unsubDM){ unsubDM(); unsubDM=null; } dmData=[];
+          $("dmLockBtn").hidden=true; $("memBtn").hidden=false;
+          cur=c.id; delete unreadCh[c.id]; lastSeenCh[c.id]=Date.now();
+          app.classList.add("open"); if(fbReady) subscribeMessages(cur);
+          swapUntil=Date.now()+1500; render(true); $("input").focus();
+        };
         li.appendChild(b); ul.appendChild(li);
       });
+    });
+    // ЛС
+    var dml=$("dmlist"); dml.innerHTML="";
+    var showSec = amAdmin() || (me && dms[me.key]);
+    if(!showSec) return;
+    dml.appendChild(el("li","cat","Личные сообщения"));
+    if(amAdmin()){
+      var li0=el("li");
+      var b0=el("button",null,"＋ Новый диалог"); b0.type="button";
+      b0.onclick=function(){ openNewDM(); };
+      li0.appendChild(b0); dml.appendChild(li0);
+    }
+    var keys=[];
+    if(amAdmin()) keys=Object.keys(dms);
+    else if(me && dms[me.key]) keys=[me.key];
+    keys.sort(function(a,b){ return ((getAcc(a)&&getAcc(a).name)||a).localeCompare((getAcc(b)&&getAcc(b).name)||b); });
+    keys.forEach(function(k){
+      var d=dms[k];
+      var li=el("li", dmUser===k ? "on" : "");
+      var b=el("button"); b.type="button";
+      var acc=getAcc(k);
+      var nm=(acc&&acc.name)||k;
+      var label = amAdmin() ? nm : "Администратор";
+      b.textContent = label + (d && d.closed ? " 🔒" : "");
+      b.onclick=function(){ openDM(k); };
+      li.appendChild(b); dml.appendChild(li);
     });
   }
   function renderMe(){ var acc=getAcc(me.key); paint($("meAva"),acc,me.name); $("who").textContent=me.name; }
   function renderMsgs(force){
+    if(dmUser){ renderDM(); return; }
     if(cur==="scripts"){ renderForum(force); return; }
     var c=chan(), box=$("msgs"), list=data[cur]||[];
     var near=box.scrollHeight-box.scrollTop-box.clientHeight<80, stick=!!force||near;
@@ -645,6 +729,82 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     });
     if(force||near) box.scrollTop=box.scrollHeight;
     animateIn(box,true,list.length>0);
+  }
+  function renderDM(){
+    if(!dmUser) return;
+    var box=$("msgs"), d=dms[dmUser];
+    var acc=getAcc(dmUser);
+    var nm=(acc&&acc.name)||dmUser;
+    $("topName").textContent = amAdmin() ? nm : "Администратор";
+    var sub = amAdmin() ? "личный диалог" : "с администратором";
+    if(d && d.closed) sub += " 🔒";
+    $("topSub").textContent = sub;
+    if(amAdmin() && d){
+      $("dmLockBtn").hidden=false;
+      $("dmLockBtn").textContent = d.closed ? "Открыть" : "Закрыть";
+      $("dmLockBtn").onclick=function(){
+        fbdb.collection("dms").doc(dmUser).update({closed: !d.closed}).catch(function(e){ console.error(e); });
+      };
+    } else {
+      $("dmLockBtn").hidden=true;
+    }
+    $("memBtn").hidden=true;
+    applyComposer();
+    box.innerHTML="";
+    if(!dmData.length){
+      box.appendChild(el("p","empty","Здесь пока нет сообщений."));
+      return;
+    }
+    dmData.forEach(function(m){
+      var acc2=getAcc(m.by), name=acc2?acc2.name:(m.name||m.by);
+      var row=el("div","m");
+      var a=el("button","ava"); a.type="button"; paint(a,acc2,name);
+      a.onclick=function(){ openProfile(m.by,name); };
+      var b=el("div","b"), h=el("div","h"), n=el("button","nm",name); n.type="button";
+      n.onclick=function(){ openProfile(m.by,name); };
+      if(roleClass(m.by)) n.classList.add(roleClass(m.by));
+      h.appendChild(n);
+      h.appendChild(el("time",null,new Date(m.t).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})));
+      b.appendChild(h); b.appendChild(el("p",null,m.text));
+      row.appendChild(a); row.appendChild(b);
+      if(fbReady && amAdmin() && m.id){
+        var x=el("button","sm delmsg","×"); x.type="button";
+        x.onclick=function(){
+          fbdb.collection("dms").doc(dmUser).collection("messages").doc(m.id).delete().catch(function(e){ console.error(e); });
+        };
+        row.appendChild(x);
+      }
+      box.appendChild(row);
+    });
+    box.scrollTop=box.scrollHeight;
+  }
+  function openNewDM(){
+    var box=$("pcard"); box.innerHTML=""; box.classList.remove("wide"); $("modal").hidden=false;
+    box.appendChild(el("h2",null,"Новый диалог"));
+    var ul=el("ul","adl");
+    var list=Object.keys(remoteUsers).filter(function(k){ return k!==me.key && !dms[k]; });
+    list.sort(function(a,b){ return ((remoteUsers[a]&&remoteUsers[a].name)||a).localeCompare((remoteUsers[b]&&remoteUsers[b].name)||b); });
+    list.forEach(function(k){
+      var li=el("li");
+      var a=el("span","ava s"); paint(a, remoteUsers[k], (remoteUsers[k]&&remoteUsers[k].name)||k);
+      li.appendChild(a);
+      li.appendChild(el("span","n", (remoteUsers[k]&&remoteUsers[k].name)||k));
+      var b=el("button","sm","Написать"); b.type="button";
+      b.onclick=function(){
+        fbdb.collection("dms").doc(k).set({
+          admin: me.name, user: k, closed: false,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          lastAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(function(){
+          closeProfile(); openDM(k);
+        }).catch(function(e){ console.error("dm create:",e); alert("Ошибка: "+e.message); });
+      };
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+    if(!ul.children.length) ul.appendChild(el("li",null,"Нет доступных пользователей"));
+    box.appendChild(ul);
+    var c=el("button","btn ghost full","Закрыть"); c.type="button"; c.onclick=closeProfile; box.appendChild(c);
   }
   function renderForum(force){
     var c=chan(), box=$("msgs"), list=data[cur]||[];
@@ -725,7 +885,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
     if(fbReady){
       waitAuth().then(function(){ return fbAuth(name); }).then(function(){
-        subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels();
+        subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels(); subscribeDMs();
       });
     }
   }
@@ -742,11 +902,22 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     return "до "+t+(d.toDateString()!==new Date().toDateString()?" ("+d.toLocaleDateString("ru-RU")+")":"");
   }
   function canWrite(){
+    if(dmUser){
+      if(!fbReady||!me) return false;
+      var d=dms[dmUser]; if(!d) return false;
+      if(d.closed && !amAdmin()) return false;
+      return true;
+    }
     if(READONLY[cur]&&fbReady&&!amAdmin()) return false;
     if(fbReady&&me&&!amAdmin()&&muteOf(me.key)) return false;
     return true;
   }
   function lockText(){
+    if(dmUser){
+      var d=dms[dmUser]; if(!d) return "";
+      if(d.closed && !amAdmin()) return "Диалог закрыт администратором";
+      return "";
+    }
     if(READONLY[cur]&&fbReady&&!amAdmin()) return cur==="scripts"?"Посты публикуют только администраторы":"Следите за новостями";
     var m=me&&muteOf(me.key); return m?"Вы в муте "+muteLabel(m):"Следите за новостями";
   }
@@ -754,6 +925,14 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var serrT=null;
   function sendErr(msg){ var e=$("serr"); e.textContent=msg; e.hidden=false; clearTimeout(serrT); serrT=setTimeout(function(){ e.hidden=true; },5000); }
   function applyComposer(){
+    if(dmUser){
+      var w=canWrite();
+      $("form").hidden=!w; $("locked").hidden=w; $("locked").textContent=lockText();
+      $("clip").hidden=true;
+      $("cmtOptRow").hidden=true;
+      if(!w) clearAttach();
+      return;
+    }
     var w=canWrite(), media=(cur==="media"||cur==="scripts")&&fbReady;
     $("form").hidden=!w; $("locked").hidden=w; $("locked").textContent=lockText();
     $("clip").hidden=!media||!w;
@@ -795,13 +974,24 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   $("prevX").onclick=clearAttach;
   $("form").onsubmit=function(e){
     e.preventDefault();
-    var t=$("input").value.trim(), img=((cur==="media"||cur==="scripts")&&fbReady)?pendImg:null;
-    if((!t&&!img)||!me||!canWrite()) return;
+    var t=$("input").value.trim();
+    if(!t||!me) return;
+    if(dmUser){
+      if(!canWrite()) return;
+      var dd=dms[dmUser]; if(!dd) return;
+      var doc={by:me.key,name:me.name,text:t.slice(0,2000),t:firebase.firestore.FieldValue.serverTimestamp()};
+      fbdb.collection("dms").doc(dmUser).collection("messages").add(doc).catch(function(err){ console.error("dm send:",err); sendErr("Не удалось отправить."); });
+      fbdb.collection("dms").doc(dmUser).update({lastAt: firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});
+      $("input").value="";
+      return;
+    }
+    var img=((cur==="media"||cur==="scripts")&&fbReady)?pendImg:null;
+    if((!t&&!img)||!canWrite()) return;
     if(fbReady){
-      var doc={by:me.key,name:me.name,text:t.slice(0,2000),createdAt:firebase.firestore.FieldValue.serverTimestamp()};
-      if(img) doc.image=img;
-      if(cur==="scripts"){ doc.commentsEnabled = $("cmtOpt").checked; }
-      fbdb.collection("channels").doc(cur).collection("messages").add(doc)
+      var doc2={by:me.key,name:me.name,text:t.slice(0,2000),createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+      if(img) doc2.image=img;
+      if(cur==="scripts"){ doc2.commentsEnabled = $("cmtOpt").checked; }
+      fbdb.collection("channels").doc(cur).collection("messages").add(doc2)
         .catch(function(err){ console.error("send:",err); sendErr("Не удалось отправить. Попробуйте ещё раз."); });
       $("input").value=""; clearAttach();
       return;
@@ -810,17 +1000,22 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(data[cur].length>500) data[cur]=data[cur].slice(-500);
     wr(SRV,data); $("input").value=""; renderMsgs(true);
   };
-  $("back").onclick=function(){ app.classList.remove("open"); };
+  $("back").onclick=function(){
+    if(dmUser){ closeDM(); app.classList.remove("open"); return; }
+    app.classList.remove("open");
+  };
   $("memBtn").onclick=function(){ app.classList.add("showmem"); };
   $("memX").onclick=function(){ app.classList.remove("showmem"); };
   $("out").onclick=function(){
     if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
+    if(unsubDMs){ unsubDMs(); unsubDMs=null; }
+    if(unsubDM){ unsubDM(); unsubDM=null; }
     stopPresence(true); stopWatchAll(); if(unsubDel){ unsubDel(); unsubDel=null; }
     if(unsubRoles){ unsubRoles(); unsubRoles=null; } if(unsubBans){ unsubBans(); unsubBans=null; } if(unsubMutes){ unsubMutes(); unsubMutes=null; }
     if(postCommentsSub){ try{ postCommentsSub(); }catch(e){} postCommentsSub=null; }
     roles={}; bans={}; mutes={}; pendMsg=null; pendBan=null;
-    remoteUsers={}; presence={};
+    remoteUsers={}; presence={}; dms={}; dmUser=null; dmData=[];
     try{ localStorage.removeItem(SESSION); }catch(e){}
     me=null; closeProfile(); app.hidden=true; $("auth").hidden=false; hidePw(); setMode("in"); $("u").focus();
   };
@@ -1211,7 +1406,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
               fbdb.collection("roles").doc(u.key).delete(),
               fbdb.collection("bans").doc(u.key).delete(),
               fbdb.collection("mutes").doc(u.key).delete(),
-              fbdb.collection("banners").doc(u.key).delete()
+              fbdb.collection("banners").doc(u.key).delete(),
+              fbdb.collection("dms").doc(u.key).delete().catch(function(){})
             ]).then(showAdmin).catch(fail);
           };
           acts.appendChild(rb); acts.appendChild(mdb); acts.appendChild(bb); acts.appendChild(b);
