@@ -424,12 +424,12 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   var EMOJIS = ["😂","🤣","🤡","😈","👿","🤬","😡","👹","👺","👍","👎","🐟"];
   var POPULAR_EMOJI = "🐟";
   var me=null,cur=CH[0].id,data={},mode="in",pendDel=null,draft=null,app=$("app"),btnToken=0, profTok=0, bannerCache={}, muteSig="", swapUntil=0, loadedCh={};
-  var unreadCh={}, lastSeenCh={}, unsubAll={}, firstSnapCh={};
+  var unreadCh={}, lastSeenCh={}, unsubAll={}, firstSnapCh={}, chSubs={};
   var postCommentsSub=null;
   var dms={}, unsubDMs=null, dmUser=null, unsubDM=null, dmData=[];
   var replyTo=null;
   var mentionOpen=false, mentionItems=[], mentionSel=0;
-  var ctxMsg=null;
+  var ctxMsg=null, beatNow=null;
 
   var I18N = {
     ru: {
@@ -622,13 +622,14 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     appId:             "1:477692936922:web:fdd8daab2a89c588f91be3"
   };
   var fbReady=false, fbdb=null;
-  var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=90000, roles={}, bans={}, unsubRoles=null, unsubBans=null, pendMsg=null, pendBan=null, pendImg=null, mutes={}, unsubMutes=null;
+  var unsubMsgs=null, unsubUsers=null, unsubPres=null, unsubDel=null, hbTimer=null, tickTimer=null, presence={}, PRES_TTL=300000, roles={}, bans={}, unsubRoles=null, unsubBans=null, pendMsg=null, pendBan=null, pendImg=null, mutes={}, unsubMutes=null;
   var remoteUsers={};
   try{
     if(typeof firebase!=="undefined" && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("ВСТАВЬ")===-1){
       firebase.initializeApp(firebaseConfig);
       firebase.auth().signInAnonymously().catch(function(e){ console.error("anon auth:",e); });
       fbdb=firebase.firestore();
+      try{ fbdb.enablePersistence({synchronizeTabs:true}).catch(function(){}); }catch(e){}
       fbReady=true;
     }
   }catch(e){ console.error("Firebase:",e); fbReady=false; }
@@ -654,10 +655,11 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   }
 
   function subscribeMessages(channelId){
-    if(!fbReady) return;
-    if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
-    unsubMsgs = fbdb.collection("channels").doc(channelId).collection("messages")
-      .orderBy("createdAt","desc").limit(channelId==="media"?20:200)
+    if(!fbReady||chSubs[channelId]) return;
+    firstSnapCh[channelId]=true;
+    var lim = channelId==="media" ? 10 : channelId==="scripts" ? 40 : 60;
+    chSubs[channelId] = fbdb.collection("channels").doc(channelId).collection("messages")
+      .orderBy("createdAt","desc").limit(lim)
       .onSnapshot(function(snap){
         var arr=[];
         snap.forEach(function(d){
@@ -667,6 +669,14 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
         arr.reverse();
         loadedCh[channelId]=true;
         data[channelId]=arr;
+        var newest=arr.length?arr[arr.length-1]:null;
+        if(me){
+          if(firstSnapCh[channelId]){ firstSnapCh[channelId]=false; if(newest) lastSeenCh[channelId]=newest.t; }
+          else if(newest){
+            if(channelId===cur){ lastSeenCh[channelId]=newest.t; delete unreadCh[channelId]; }
+            else if(newest.by!==me.key && newest.t>(lastSeenCh[channelId]||0)){ setUnread(channelId, detectMentionLevel(newest.text)); }
+          }
+        }
         if(cur===channelId && !dmUser) renderMsgs();
       }, function(e){ console.error("messages:",e); loadedCh[channelId]=true; if(cur===channelId && !dmUser) renderMsgs(); });
   }
@@ -686,22 +696,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     return 'msg';
   }
 
-  function watchAllChannels(){
-    if(!fbReady) return;
-    CH.forEach(function(c){
-      if(unsubAll[c.id]) return;
-      firstSnapCh[c.id]=true;
-      unsubAll[c.id]=fbdb.collection("channels").doc(c.id).collection("messages").orderBy("createdAt","desc").limit(1)
-        .onSnapshot(function(snap){
-          var latest=null;
-          snap.forEach(function(d){ var x=d.data(); var ts=x.createdAt?x.createdAt.toDate().getTime():0; if(!latest||ts>latest.t) latest={t:ts,by:x.by,text:x.text||""}; });
-          if(!latest) return;
-          if(firstSnapCh[c.id]){ firstSnapCh[c.id]=false; lastSeenCh[c.id]=latest.t; return; }
-          if(c.id===cur){ lastSeenCh[c.id]=latest.t; delete unreadCh[c.id]; return; }
-          if(latest.by!==me.key && latest.t>(lastSeenCh[c.id]||0)){ setUnread(c.id, detectMentionLevel(latest.text)); }
-        },function(e){ console.error("watch:"+c.id,e); });
-    });
-  }
   function stopWatchAll(){ Object.keys(unsubAll).forEach(function(k){ try{ unsubAll[k](); }catch(e){} }); unsubAll={}; firstSnapCh={}; unreadCh={}; lastSeenCh={}; }
 
   function subscribeDMs(){
@@ -722,14 +716,14 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function subscribeDM(userKey){
     if(unsubDM){ unsubDM(); unsubDM=null; }
     if(!fbReady){ dmData=[]; return; }
-    unsubDM = fbdb.collection("dms").doc(userKey).collection("messages").orderBy("t","asc").limit(200)
+    unsubDM = fbdb.collection("dms").doc(userKey).collection("messages").orderBy("t","desc").limit(100)
       .onSnapshot(function(snap){
         var arr=[];
         snap.forEach(function(d){
           var x=d.data();
           arr.push({id:d.id,by:x.by,name:x.name,text:x.text,reply:x.reply||null,reactions:x.reactions||{},t:x.t&&x.t.toMillis?x.t.toMillis():Date.now()});
         });
-        dmData=arr;
+        arr.reverse(); dmData=arr;
         if(dmUser===userKey) renderDM();
       },function(e){ console.error("dm:",e); });
   }
@@ -750,10 +744,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function subscribeUsers(){
     if(!fbReady) return;
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
-    fbdb.collection("users").get().then(function(snap){
-      var tmp={}; snap.forEach(function(d){ tmp[d.id]=d.data(); }); remoteUsers=tmp;
-      if(me){ renderMe(); renderMembers(); } renderMsgs();
-    }).catch(function(e){ console.error("users.get:",e); });
     unsubUsers = fbdb.collection("users").onSnapshot(function(snap){
       var tmp={}; snap.forEach(function(d){ tmp[d.id]=d.data(); }); remoteUsers=tmp;
       if(me){ renderMe(); renderMembers(); } renderMsgs();
@@ -824,8 +814,9 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     if(unsubRoles){ unsubRoles(); unsubRoles=null; }
     if(unsubBans){ unsubBans(); unsubBans=null; }
     unsubRoles=fbdb.collection("roles").onSnapshot(function(snap){
-      var tmp={}; snap.forEach(function(d){ tmp[d.id]=d.data(); }); roles=tmp;
-      if(me){ renderMembers(); renderMsgs(); subscribeDMs(); }
+      var tmp={}; snap.forEach(function(d){ tmp[d.id]=d.data(); });
+      var wasAdmin=amAdmin(); roles=tmp;
+      if(me){ renderMembers(); renderMsgs(); if(wasAdmin!==amAdmin()) subscribeDMs(); }
     },function(e){ console.error("roles:",e); });
     if(unsubMutes){ unsubMutes(); unsubMutes=null; }
     unsubMutes=fbdb.collection("mutes").onSnapshot(function(snap){
@@ -846,6 +837,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     });
   }
   function stopPresence(del){
+    beatNow=null;
     if(hbTimer){ clearInterval(hbTimer); hbTimer=null; }
     if(tickTimer){ clearInterval(tickTimer); tickTimer=null; }
     if(unsubPres){ unsubPres(); unsubPres=null; }
@@ -854,8 +846,8 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   function startPresence(){
     if(!fbReady||!me) return;
     stopPresence(false);
-    var beat=function(){ if(!me) return; fbdb.collection("presence").doc(me.key).set({name:me.name,t:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){}); };
-    beat(); hbTimer=setInterval(beat,25000);
+    var beat=function(){ if(!me||document.hidden) return; fbdb.collection("presence").doc(me.key).set({name:me.name,t:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){}); };
+    beatNow=beat; beat(); hbTimer=setInterval(beat,120000);
     unsubPres=fbdb.collection("presence").onSnapshot(function(snap){
       var tmp={}; snap.forEach(function(d){ var ts=d.data().t; tmp[d.id]=(ts&&ts.toMillis)?ts.toMillis():Date.now(); });
       presence=tmp; renderMembers();
@@ -863,6 +855,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     tickTimer=setInterval(function(){ renderMembers(); applyComposer(); var sg=activeMuteSig(); if(sg!==muteSig){ muteSig=sg; renderMsgs(); } },15000);
   }
   window.addEventListener("pagehide",function(){ stopPresence(true); });
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden&&beatNow) beatNow(); });
   function checkDeleted(key){ if(!fbReady) return Promise.resolve(false); return fbdb.collection("deleted").doc(key).get().then(function(d){return d.exists;}).catch(function(){return false;}); }
   function ensureRemoteUser(){
     var a=users()[me.key]; if(!fbReady||!a) return;
@@ -1417,7 +1410,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
     hidePw(); $("auth").hidden=true; app.hidden=false; app.classList.remove("open","showmem"); render(true);
     if(fbReady){
       waitAuth().then(function(){ return fbAuth(name); }).then(function(){
-        subscribeUsers(); subscribeMessages(cur); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); watchAllChannels(); subscribeDMs();
+        subscribeUsers(); CH.forEach(function(c){ subscribeMessages(c.id); }); startPresence(); watchDeleted(); watchRoles(); ensureRemoteUser(); subscribeDMs();
       });
     }
   }
@@ -1577,7 +1570,6 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
       var docDM={by:me.key,name:me.name,text:txt.slice(0,2000),t:firebase.firestore.FieldValue.serverTimestamp()};
       if(replyPayload) docDM.reply=replyPayload;
       fbdb.collection("dms").doc(dmUser).collection("messages").add(docDM).catch(function(err){ console.error("dm send:",err); sendErr(t('send_fail')); });
-      fbdb.collection("dms").doc(dmUser).update({lastAt: firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});
       $("input").value=""; clearReply();
       return;
     }
@@ -1612,7 +1604,7 @@ select,.apanel input[type=number]{font:inherit;color:inherit;background:var(--bg
   $("clearBtn").onclick=function(){ if(dmUser) return; clearChannel(cur); };
   $("out").onclick=function(){
     closeCtxMenu(); closeEmojiPicker();
-    if(unsubMsgs){ unsubMsgs(); unsubMsgs=null; }
+    Object.keys(chSubs).forEach(function(k){ try{ chSubs[k](); }catch(e){} }); chSubs={};
     if(unsubUsers){ unsubUsers(); unsubUsers=null; }
     if(unsubDMs){ unsubDMs(); unsubDMs=null; }
     if(unsubDM){ unsubDM(); unsubDM=null; }
